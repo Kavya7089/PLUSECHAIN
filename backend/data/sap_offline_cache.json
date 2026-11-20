@@ -1,0 +1,496 @@
+{
+  "inventory": [
+    {
+      "HOSPITAL_ID": "H001",
+      "HOSPITAL_NAME": "Mumbai Central General",
+      "CITY": "BHOPAL",
+      "MATERIAL_ID": "INS001",
+      "STOCK_QTY": 600,
+      "DAILY_USE": 100,
+      "UNIT": "EA",
+      "MATERIAL_NAME": "Insulin Glargine",
+      "daysCover": 6
+    },
+    {
+      "HOSPITAL_ID": "H002",
+      "HOSPITAL_NAME": "Delhi Critical Care Trust",
+      "CITY": "INDORE",
+      "MATERIAL_ID": "INS001",
+      "STOCK_QTY": 150,
+      "DAILY_USE": 50,
+      "UNIT": "EA",
+      "MATERIAL_NAME": "Insulin Glargine",
+      "daysCover": 3
+    },
+    {
+      "HOSPITAL_ID": "H003",
+      "HOSPITAL_NAME": "Pune Memorial Medical",
+      "CITY": "JABALPUR",
+      "MATERIAL_ID": "INS001",
+      "STOCK_QTY": 1800,
+      "DAILY_USE": 100,
+      "UNIT": "EA",
+      "MATERIAL_NAME": "Insulin Glargine",
+      "daysCover": 18
+    },
+    {
+      "HOSPITAL_ID": "H001",
+      "HOSPITAL_NAME": "Mumbai Central General",
+      "CITY": "MUMBAI",
+      "MATERIAL_ID": "AMX002",
+      "STOCK_QTY": 120,
+      "DAILY_USE": 40,
+      "UNIT": "VIAL"
+    },
+    {
+      "HOSPITAL_ID": "H004",
+      "HOSPITAL_NAME": "Bhopal Apex Care Hospital",
+      "CITY": "BHOPAL",
+      "MATERIAL_ID": "AMX002",
+      "STOCK_QTY": 90,
+      "DAILY_USE": 45,
+      "UNIT": "VIAL"
+    },
+    {
+      "HOSPITAL_ID": "H004",
+      "HOSPITAL_NAME": "Bhopal Apex Care Hospital",
+      "CITY": "BHOPAL",
+      "MATERIAL_ID": "INS001",
+      "STOCK_QTY": 150,
+      "DAILY_USE": 30,
+      "UNIT": "EA",
+      "MATERIAL_NAME": "Insulin Glargine",
+      "daysCover": 5
+    },
+    {
+      "HOSPITAL_ID": "H004",
+      "HOSPITAL_NAME": "Bhopal Apex Care Hospital",
+      "CITY": "BHOPAL",
+      "MATERIAL_ID": "HEP004",
+      "STOCK_QTY": 110,
+      "DAILY_USE": 35,
+      "UNIT": "VIAL"
+    },
+    {
+      "HOSPITAL_ID": "H004",
+      "HOSPITAL_NAME": "Bhopal Apex Care Hospital",
+      "CITY": "BHOPAL",
+      "MATERIAL_ID": "SAL005",
+      "STOCK_QTY": 350,
+      "DAILY_USE": 100,
+      "UNIT": "BAG"
+    },
+    {
+      "HOSPITAL_ID": "H005",
+      "HOSPITAL_NAME": "Central Surplus Logistics Hub H005",
+      "CITY": "BHOPAL",
+      "MATERIAL_ID": "INS001",
+      "STOCK_QTY": 0,
+      "DAILY_USE": 150,
+      "UNIT": "EA",
+      "MATERIAL_NAME": "Insulin Glargine",
+      "daysCover": 0
+    },
+    {
+      "HOSPITAL_ID": "H005",
+      "HOSPITAL_NAME": "Central Surplus Logistics Hub H005",
+      "CITY": "BHOPAL",
+      "MATERIAL_ID": "AMX002",
+      "STOCK_QTY": 4000,
+      "DAILY_USE": 40,
+      "UNIT": "VIAL"
+    },
+    {
+      "HOSPITAL_ID": "H005",
+      "HOSPITAL_NAME": "Central Surplus Logistics Hub H005",
+      "CITY": "BHOPAL",
+      "MATERIAL_ID": "PROP003",
+      "STOCK_QTY": 3000,
+      "DAILY_USE": 30,
+      "UNIT": "VIAL"
+    },
+    {
+      "HOSPITAL_ID": "H005",
+      "HOSPITAL_NAME": "Central Surplus Logistics Hub H005",
+      "CITY": "BHOPAL",
+      "MATERIAL_ID": "HEP004",
+      "STOCK_QTY": 2500,
+      "DAILY_USE": 25,
+      "UNIT": "VIAL"
+    },
+    {
+      "HOSPITAL_ID": "H005",
+      "HOSPITAL_NAME": "Central Surplus Logistics Hub H005",
+      "CITY": "BHOPAL",
+      "MATERIAL_ID": "SAL005",
+      "STOCK_QTY": 8000,
+      "DAILY_USE": 80,
+      "UNIT": "BAG"
+    },
+    {
+      "HOSPITAL_ID": "H006",
+      "HOSPITAL_NAME": "Indore Super Specialty",
+      "CITY": "INDORE",
+      "MATERIAL_ID": "INS001",
+      "STOCK_QTY": 600,
+      "DAILY_USE": 10,
+      "UNIT": "EA",
+      "MATERIAL_NAME": "Insulin Glargine",
+      "daysCover": 60
+    },
+    {
+      "HOSPITAL_ID": "H006",
+      "HOSPITAL_NAME": "Indore Super Specialty Hub",
+      "CITY": "INDORE",
+      "MATERIAL_ID": "AMX002",
+      "STOCK_QTY": 3500,
+      "DAILY_USE": 35,
+      "UNIT": "VIAL"
+    },
+    {
+      "HOSPITAL_ID": "H006",
+      "HOSPITAL_NAME": "Indore Super Specialty Hub",
+      "CITY": "INDORE",
+      "MATERIAL_ID": "PROP003",
+      "STOCK_QTY": 2800,
+      "DAILY_USE": 20,
+      "UNIT": "VIAL"
+    },
+    {
+      "HOSPITAL_ID": "H001",
+      "HOSPITAL_NAME": "Mumbai Central General",
+      "CITY": "BHOPAL",
+      "MATERIAL_ID": "PAR050",
+      "MATERIAL_NAME": "Paracetamol 500mg",
+      "STOCK_QTY": 2000,
+      "DAILY_USE": 400,
+      "UNIT": "EA",
+      "daysCover": 5
+    },
+    {
+      "HOSPITAL_ID": "H002",
+      "HOSPITAL_NAME": "Delhi Critical Care Trust",
+      "CITY": "INDORE",
+      "MATERIAL_ID": "PAR050",
+      "MATERIAL_NAME": "Paracetamol 500mg",
+      "STOCK_QTY": 1500,
+      "DAILY_USE": 300,
+      "UNIT": "EA",
+      "daysCover": 5
+    },
+    {
+      "HOSPITAL_ID": "H003",
+      "HOSPITAL_NAME": "Pune Memorial Medical",
+      "CITY": "JABALPUR",
+      "MATERIAL_ID": "PAR050",
+      "MATERIAL_NAME": "Paracetamol 500mg",
+      "STOCK_QTY": 800,
+      "DAILY_USE": 200,
+      "UNIT": "EA",
+      "daysCover": 4
+    },
+    {
+      "HOSPITAL_ID": "H004",
+      "HOSPITAL_NAME": "Bhopal Apex Care Hospital",
+      "CITY": "BHOPAL",
+      "MATERIAL_ID": "PAR050",
+      "MATERIAL_NAME": "Paracetamol 500mg",
+      "STOCK_QTY": 500,
+      "DAILY_USE": 100,
+      "UNIT": "EA",
+      "daysCover": 5
+    },
+    {
+      "HOSPITAL_ID": "H005",
+      "HOSPITAL_NAME": "Central Surplus Logistics Hub H005",
+      "CITY": "BHOPAL",
+      "MATERIAL_ID": "PAR050",
+      "MATERIAL_NAME": "Paracetamol 500mg",
+      "STOCK_QTY": 2500,
+      "DAILY_USE": 450,
+      "UNIT": "EA",
+      "daysCover": 5
+    },
+    {
+      "HOSPITAL_ID": "H002",
+      "HOSPITAL_NAME": "Delhi Critical Care Trust",
+      "CITY": "INDORE",
+      "MATERIAL_ID": "AMX250",
+      "MATERIAL_NAME": "Amoxicillin 250mg",
+      "STOCK_QTY": 800,
+      "DAILY_USE": 150,
+      "UNIT": "EA",
+      "daysCover": 5
+    },
+    {
+      "HOSPITAL_ID": "H003",
+      "HOSPITAL_NAME": "Pune Memorial Medical",
+      "CITY": "JABALPUR",
+      "MATERIAL_ID": "AMX250",
+      "MATERIAL_NAME": "Amoxicillin 250mg",
+      "STOCK_QTY": 400,
+      "DAILY_USE": 100,
+      "UNIT": "EA",
+      "daysCover": 4
+    },
+    {
+      "HOSPITAL_ID": "H004",
+      "HOSPITAL_NAME": "Bhopal Apex Care Hospital",
+      "CITY": "BHOPAL",
+      "MATERIAL_ID": "AMX250",
+      "MATERIAL_NAME": "Amoxicillin 250mg",
+      "STOCK_QTY": 200,
+      "DAILY_USE": 50,
+      "UNIT": "EA",
+      "daysCover": 4
+    },
+    {
+      "HOSPITAL_ID": "H005",
+      "HOSPITAL_NAME": "Central Surplus Logistics Hub H005",
+      "CITY": "BHOPAL",
+      "MATERIAL_ID": "AMX250",
+      "MATERIAL_NAME": "Amoxicillin 250mg",
+      "STOCK_QTY": 1500,
+      "DAILY_USE": 250,
+      "UNIT": "EA",
+      "daysCover": 6
+    },
+    {
+      "HOSPITAL_ID": "H001",
+      "HOSPITAL_NAME": "Mumbai Central General",
+      "CITY": "BHOPAL",
+      "MATERIAL_ID": "OXY005",
+      "MATERIAL_NAME": "Medical Oxygen Cylinder",
+      "STOCK_QTY": 50,
+      "DAILY_USE": 10,
+      "UNIT": "EA",
+      "daysCover": 5
+    },
+    {
+      "HOSPITAL_ID": "H002",
+      "HOSPITAL_NAME": "Delhi Critical Care Trust",
+      "CITY": "INDORE",
+      "MATERIAL_ID": "OXY005",
+      "MATERIAL_NAME": "Medical Oxygen Cylinder",
+      "STOCK_QTY": 35,
+      "DAILY_USE": 5,
+      "UNIT": "EA",
+      "daysCover": 7
+    },
+    {
+      "HOSPITAL_ID": "H003",
+      "HOSPITAL_NAME": "Pune Memorial Medical",
+      "CITY": "JABALPUR",
+      "MATERIAL_ID": "OXY005",
+      "MATERIAL_NAME": "Medical Oxygen Cylinder",
+      "STOCK_QTY": 20,
+      "DAILY_USE": 5,
+      "UNIT": "EA",
+      "daysCover": 4
+    },
+    {
+      "HOSPITAL_ID": "H004",
+      "HOSPITAL_NAME": "Bhopal Apex Care Hospital",
+      "CITY": "BHOPAL",
+      "MATERIAL_ID": "OXY005",
+      "MATERIAL_NAME": "Medical Oxygen Cylinder",
+      "STOCK_QTY": 8,
+      "DAILY_USE": 2,
+      "UNIT": "EA",
+      "daysCover": 4
+    },
+    {
+      "HOSPITAL_ID": "H005",
+      "HOSPITAL_NAME": "Central Surplus Logistics Hub H005",
+      "CITY": "BHOPAL",
+      "MATERIAL_ID": "OXY005",
+      "MATERIAL_NAME": "Medical Oxygen Cylinder",
+      "STOCK_QTY": 60,
+      "DAILY_USE": 12,
+      "UNIT": "EA",
+      "daysCover": 5
+    },
+    {
+      "HOSPITAL_ID": "H001",
+      "HOSPITAL_NAME": "Mumbai Central General",
+      "CITY": "BHOPAL",
+      "MATERIAL_ID": "SAL500",
+      "MATERIAL_NAME": "0.9% Normal Saline 500mL",
+      "STOCK_QTY": 1000,
+      "DAILY_USE": 250,
+      "UNIT": "BAG",
+      "daysCover": 4
+    },
+    {
+      "HOSPITAL_ID": "H002",
+      "HOSPITAL_NAME": "Delhi Critical Care Trust",
+      "CITY": "INDORE",
+      "MATERIAL_ID": "SAL500",
+      "MATERIAL_NAME": "0.9% Normal Saline 500mL",
+      "STOCK_QTY": 750,
+      "DAILY_USE": 150,
+      "UNIT": "BAG",
+      "daysCover": 5
+    },
+    {
+      "HOSPITAL_ID": "H003",
+      "HOSPITAL_NAME": "Pune Memorial Medical",
+      "CITY": "JABALPUR",
+      "MATERIAL_ID": "SAL500",
+      "MATERIAL_NAME": "0.9% Normal Saline 500mL",
+      "STOCK_QTY": 300,
+      "DAILY_USE": 100,
+      "UNIT": "BAG",
+      "daysCover": 3
+    },
+    {
+      "HOSPITAL_ID": "H004",
+      "HOSPITAL_NAME": "Bhopal Apex Care Hospital",
+      "CITY": "BHOPAL",
+      "MATERIAL_ID": "SAL500",
+      "MATERIAL_NAME": "0.9% Normal Saline 500mL",
+      "STOCK_QTY": 100,
+      "DAILY_USE": 50,
+      "UNIT": "BAG",
+      "daysCover": 2
+    },
+    {
+      "HOSPITAL_ID": "H005",
+      "HOSPITAL_NAME": "Central Surplus Logistics Hub H005",
+      "CITY": "BHOPAL",
+      "MATERIAL_ID": "SAL500",
+      "MATERIAL_NAME": "0.9% Normal Saline 500mL",
+      "STOCK_QTY": 1200,
+      "DAILY_USE": 300,
+      "UNIT": "BAG",
+      "daysCover": 4
+    },
+    {
+      "HOSPITAL_ID": "H001",
+      "HOSPITAL_NAME": "Mumbai Central General",
+      "CITY": "BHOPAL",
+      "MATERIAL_ID": "AMX250",
+      "MATERIAL_NAME": "Amoxicillin 250mg",
+      "STOCK_QTY": 1200,
+      "DAILY_USE": 200,
+      "UNIT": "EA",
+      "daysCover": 6
+    },
+    {
+      "HOSPITAL_ID": "H006",
+      "HOSPITAL_NAME": "Indore Super Specialty",
+      "CITY": "INDORE",
+      "MATERIAL_ID": "OXY005",
+      "MATERIAL_NAME": "Medical Oxygen Cylinder",
+      "STOCK_QTY": 120,
+      "DAILY_USE": 2,
+      "UNIT": "EA",
+      "daysCover": 60
+    }
+  ],
+  "suppliers": [
+    {
+      "SUPPLIER_ID": "V1001",
+      "SUPPLIER_NAME": "BioPharm Global Logistics",
+      "MATERIAL_ID": "INS001",
+      "LEAD_TIME": 2,
+      "CAPACITY": 5000,
+      "UNIT_COST": 150,
+      "CURRENCY": "INR",
+      "COMPLIANCE": "Y",
+      "RELIABILITY": "98%"
+    },
+    {
+      "SUPPLIER_ID": "V1002",
+      "SUPPLIER_NAME": "Apex Medical Supplies",
+      "MATERIAL_ID": "INS001",
+      "LEAD_TIME": 5,
+      "CAPACITY": 10000,
+      "UNIT_COST": 120,
+      "CURRENCY": "INR",
+      "COMPLIANCE": "Y",
+      "RELIABILITY": "98%"
+    },
+    {
+      "SUPPLIER_ID": "V1003",
+      "SUPPLIER_NAME": "Reliant Cold-Chain Transport",
+      "MATERIAL_ID": "INS001",
+      "LEAD_TIME": 1,
+      "CAPACITY": 2000,
+      "UNIT_COST": 190,
+      "CURRENCY": "INR",
+      "COMPLIANCE": "N",
+      "RELIABILITY": "74%"
+    },
+    {
+      "SUPPLIER_ID": "V1004",
+      "SUPPLIER_NAME": "MedExpress India",
+      "MATERIAL_ID": "AMX002",
+      "LEAD_TIME": 3,
+      "CAPACITY": 8000,
+      "UNIT_COST": 65,
+      "CURRENCY": "INR",
+      "COMPLIANCE": "Y",
+      "RELIABILITY": "97%"
+    },
+    {
+      "SUPPLIER_ID": "V1005",
+      "SUPPLIER_NAME": "Zenith Pharma Logistics",
+      "MATERIAL_ID": "AMX002",
+      "LEAD_TIME": 7,
+      "CAPACITY": 15000,
+      "UNIT_COST": 45,
+      "CURRENCY": "INR",
+      "COMPLIANCE": "Y",
+      "RELIABILITY": "92%"
+    },
+    {
+      "SUPPLIER_ID": "V1006",
+      "SUPPLIER_NAME": "LifeLine Supply Network",
+      "MATERIAL_ID": "PROP003",
+      "LEAD_TIME": 2,
+      "CAPACITY": 3000,
+      "UNIT_COST": 320,
+      "CURRENCY": "INR",
+      "COMPLIANCE": "Y",
+      "RELIABILITY": "98%"
+    },
+    {
+      "SUPPLIER_ID": "V1001",
+      "SUPPLIER_NAME": "BioPharm Global Logistics",
+      "MATERIAL_ID": "OXY005",
+      "LEAD_TIME": 1,
+      "CAPACITY": 200,
+      "UNIT_COST": 500,
+      "CURRENCY": "INR",
+      "COMPLIANCE": "Y",
+      "RELIABILITY": "98%"
+    },
+    {
+      "SUPPLIER_ID": "V1003",
+      "SUPPLIER_NAME": "Reliant Cold-Chain Transport",
+      "MATERIAL_ID": "OXY005",
+      "LEAD_TIME": 4,
+      "CAPACITY": 800,
+      "UNIT_COST": 400,
+      "CURRENCY": "INR",
+      "COMPLIANCE": "N",
+      "RELIABILITY": "72%"
+    },
+    {
+      "SUPPLIER_ID": "V1001",
+      "SUPPLIER_NAME": "BioPharm Global Logistics",
+      "MATERIAL_ID": "AMX002",
+      "LEAD_TIME": 2,
+      "CAPACITY": 10000,
+      "UNIT_COST": 80,
+      "CURRENCY": "INR",
+      "COMPLIANCE": "Y",
+      "RELIABILITY": "98%"
+    }
+  ],
+  "stockAudits": [],
+  "supplierBids": [],
+  "reallocations": [],
+  "lastUpdated": "2026-11-20T12:10:07.603Z"
+}

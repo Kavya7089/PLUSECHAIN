@@ -1,0 +1,43 @@
+# Node Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Build artifacts
+dist/
+build/
+
+# Environment files & Secrets (Strictly Excluded)
+.env
+.env.*
+!.env.example
+backend/.env
+backend/.env.*
+!backend/.env.example
+frontend/.env
+frontend/.env.*
+!frontend/.env.example
+
+# Test files & Verification Scripts (Strictly Excluded)
+test_*.js
+*_test.js
+pulsechain_system_check.js
+test_enterprise_suite.js
+test_suite.js
+test/
+tests/
+
+# Root files (Active project is contained in backend/ and frontend/)
+/server.js
+/sapAdapter.js
+/data/
+/package.json
+/package-lock.json
+
+# Logs & temp
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.DS_Store
+Thumbs.db
