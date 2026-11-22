@@ -75,24 +75,18 @@ export default function Sidebar({
   return (
     <aside className="w-72 shrink-0 glass-panel border-r border-[#e0e8e2]/10 bg-[#2c2e35]/80 backdrop-blur-2xl flex flex-col h-screen sticky top-0 z-30 transition-all">
       {/* Brand & Identity with Official PulseChain Logo */}
-      <div className="p-5 border-b border-[#e0e8e2]/10 flex items-center space-x-3.5">
-        <div className="relative flex items-center justify-center w-12 h-12 rounded-2xl bg-white/95 p-1.5 shadow-lg shadow-[#467750]/30 ring-1 ring-[#f0cd6e]/50 shrink-0">
+      <div className="p-2  border-b border-[#e0e8e2]/10 flex items-center space-x-3.5">
+        <div className="relative flex items-center justify-center w-12 h-12 rounded-2xl">
           <img
             src="/pulsechain-logo.png"
             alt="PulseChain Logo"
             className="w-full h-full object-contain"
           />
-          <span className="absolute -bottom-1 -right-1 flex h-3 w-3">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#89c07e] opacity-75"></span>
-            <span className="relative inline-flex rounded-full h-3 w-3 bg-[#89c07e] ring-2 ring-[#2c2e35]"></span>
-          </span>
         </div>
         <div className="min-w-0">
           <div className="flex items-center space-x-1.5">
             <h1 className="text-lg font-black tracking-tight text-[#e0e8e2]">PulseChain</h1>
-            <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-[#2a3f3f] text-[#f0cd6e] border border-[#f0cd6e]/40 font-bold">
-              AI 2.5
-            </span>
+            
           </div>
           <p className="text-[11px] text-[#e0e8e2]/60 font-mono tracking-tight truncate">
             Autonomous Supply Tower
