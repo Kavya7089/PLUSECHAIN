@@ -179,9 +179,14 @@ const DEMO_USERS = [
   },
   {
     id: 'U008',
-    name: 'Madhya Pradesh Regional Health Admin',
+    name: "Team Techy's Regional Admin",
     email: 'regional.head@pulsechain.org',
-    aliases: ['kavyarajoria2552@gmail.com', 'admin@pulsechain.com'],
+    aliases: [
+      'kavya.0111cd231058@technocratsgrou.com',
+      'kavyarajoria2552@gmail.com',
+      'admin@pulsechain.com',
+      'admin@pulsechain.org',
+    ],
     passwordHash: DEMO_PASSWORD_HASH,
     role: 'REGIONAL_HEAD',
     legacyRole: 'REGIONAL_ADMIN',

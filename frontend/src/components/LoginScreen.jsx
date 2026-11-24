@@ -102,7 +102,7 @@ export default function LoginScreen() {
       setEmail('soumaydubey073@gmail.com');
       setPassword('Pulse@2026');
     } else if (roleKey === 'admin') {
-      setEmail('kavya.0111cd231058@technocratsgrou.com');
+      setEmail('regional.head@pulsechain.org');
       setPassword('Pulse@2026');
     }
     await quickDemoLogin(roleKey);
@@ -191,7 +191,7 @@ export default function LoginScreen() {
                     </span>
                   </div>
                   <div className="text-[10px] text-abyss-text dark:text-volt font-mono font-bold">Regional Admin</div>
-                  <div className="text-[9px] text-abyss-muted truncate">MP State Administration</div>
+                  <div className="text-[9px] text-abyss-muted truncate font-mono">regional.head@pulsechain.org</div>
                 </button>
 
                 {/* 2. H004 Manager (Bhopal) */}

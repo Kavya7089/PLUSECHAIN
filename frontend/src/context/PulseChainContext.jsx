@@ -296,7 +296,7 @@ export function PulseChainProvider({ children }) {
     } else if (roleKey === 'supplier_v1003' || roleKey === 'v1003') {
       email = 'v1003@fastmed.in';
     } else if (roleKey === 'admin' || roleKey === 'REGIONAL_ADMIN') {
-      email = 'kavya.0111cd231058@technocratsgrou.com';
+      email = 'regional.head@pulsechain.org';
     }
 
     const res = await login(email, defaultPass);

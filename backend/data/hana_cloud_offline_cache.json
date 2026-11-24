@@ -3,55 +3,32 @@
     {
       "CITY": "BHOPAL",
       "MONITORED_HOSPITALS": 2,
-      "AVG_DAYS_COVER": null,
-      "CRITICAL_ALERTS": 4,
-      "HIGH_RISK_EVENTS": 4,
-      "LAST_SNAPSHOT_AT": "2026-11-24T14:09:20.259Z"
+      "TOTAL_SNAPSHOTS": 3,
+      "AVG_DAYS_COVER": "13.00",
+      "CRITICAL_ALERTS": 1,
+      "HIGH_RISK_EVENTS": 1,
+      "LAST_SYNCED_AT": "2026-11-24T11:53:06.678"
     },
     {
       "CITY": "JABALPUR",
       "MONITORED_HOSPITALS": 1,
-      "AVG_DAYS_COVER": 3,
+      "TOTAL_SNAPSHOTS": 1,
+      "AVG_DAYS_COVER": "3.00",
       "CRITICAL_ALERTS": 1,
-      "HIGH_RISK_EVENTS": 1,
-      "LAST_SNAPSHOT_AT": "2026-11-24T11:53:06.715"
+      "HIGH_RISK_EVENTS": 0,
+      "LAST_SYNCED_AT": "2026-11-24T11:53:06.715"
     },
     {
       "CITY": "INDORE",
       "MONITORED_HOSPITALS": 1,
-      "AVG_DAYS_COVER": 6,
-      "CRITICAL_ALERTS": 1,
+      "TOTAL_SNAPSHOTS": 1,
+      "AVG_DAYS_COVER": "6.00",
+      "CRITICAL_ALERTS": 0,
       "HIGH_RISK_EVENTS": 0,
-      "LAST_SNAPSHOT_AT": "2026-11-24T11:53:06.696"
+      "LAST_SYNCED_AT": "2026-11-24T11:53:06.696"
     }
   ],
   "riskSnapshots": [
-    {
-      "ID": "SNAP-MWURTL6R-624",
-      "CITY": "BHOPAL",
-      "HOSPITAL_ID": "H004",
-      "MATERIAL_ID": "PAR050",
-      "STOCK_QTY": 1500,
-      "DAILY_USE": 120,
-      "DAYS_COVER": 4,
-      "EXTERNAL_RISK": "AI_ALERT_ACTIVE",
-      "DELIVERY_IMPACT": "EXECUTION_PENDING",
-      "WEATHER_TEMP_C": 28.5,
-      "RECORDED_AT": "2026-11-24T14:09:20.259Z"
-    },
-    {
-      "ID": "SNAP-MWUOER58-876",
-      "CITY": "BHOPAL",
-      "HOSPITAL_ID": "H004",
-      "MATERIAL_ID": "PAR050",
-      "STOCK_QTY": 1500,
-      "DAILY_USE": 120,
-      "DAYS_COVER": 5,
-      "EXTERNAL_RISK": "AI_ALERT_ACTIVE",
-      "DELIVERY_IMPACT": "EXECUTION_PENDING",
-      "WEATHER_TEMP_C": 28.5,
-      "RECORDED_AT": "2026-11-24T12:33:49.292Z"
-    },
     {
       "SNAPSHOT_ID": 5,
       "CITY": "JABALPUR",
