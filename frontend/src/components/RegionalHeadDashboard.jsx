@@ -39,6 +39,12 @@ export default function RegionalHeadDashboard() {
   const [shipments, setShipments] = useState({ outgoingDispatches: [], incomingReceipts: [] });
   const [loadingShipments, setLoadingShipments] = useState(false);
 
+  // SAP HANA Cloud Executive Analytics State
+  const [hanaAnalytics, setHanaAnalytics] = useState(null);
+  const [loadingHana, setLoadingHana] = useState(false);
+  const [syncingHana, setSyncingHana] = useState(false);
+  const [hanaSyncStatus, setHanaSyncStatus] = useState(null);
+
   // Inline User Registration Modal State
   const [regModalOpen, setRegModalOpen] = useState(false);
   const [regEmail, setRegEmail] = useState('');
@@ -106,10 +112,55 @@ export default function RegionalHeadDashboard() {
     }
   };
 
+  // Fetch Live SAP HANA Cloud Analytics Warehouse
+  const fetchHanaAnalytics = async () => {
+    setLoadingHana(true);
+    try {
+      const res = await axios.get(`${API_BASE_URL}/analytics/hana-cloud`);
+      if (res.data?.success) {
+        setHanaAnalytics(res.data);
+      }
+    } catch (err) {
+      console.warn('Failed to load SAP HANA Cloud analytics:', err.message);
+    } finally {
+      setLoadingHana(false);
+    }
+  };
+
+  // Sync Current S/4HANA Inventory & Sensing to SAP HANA Cloud Warehouse
+  const handleSyncHanaCloud = async () => {
+    setSyncingHana(true);
+    setHanaSyncStatus(null);
+    try {
+      const res = await axios.post(`${API_BASE_URL}/analytics/hana-cloud/sync`);
+      if (res.data?.success) {
+        setHanaAnalytics(res.data.analytics);
+        setHanaSyncStatus({
+          type: 'success',
+          message: res.data.message || 'Successfully synchronized SAP S/4HANA records to SAP HANA Cloud.',
+        });
+        setLastUpdated(new Date().toLocaleTimeString());
+      } else {
+        setHanaSyncStatus({
+          type: 'error',
+          message: res.data?.error || 'HANA Cloud synchronization returned failure.',
+        });
+      }
+    } catch (err) {
+      setHanaSyncStatus({
+        type: 'error',
+        message: err.response?.data?.error || err.message || 'Failed to trigger HANA Cloud sync.',
+      });
+    } finally {
+      setSyncingHana(false);
+    }
+  };
+
   useEffect(() => {
     fetchStaff();
     fetchSupplierMaster();
     fetchRegionalShipments();
+    fetchHanaAnalytics();
   }, []);
 
   const handleRefreshAll = async () => {
@@ -118,6 +169,7 @@ export default function RegionalHeadDashboard() {
       fetchStaff(),
       fetchSupplierMaster(),
       fetchRegionalShipments(),
+      fetchHanaAnalytics(),
     ]);
     setLastUpdated(new Date().toLocaleTimeString());
   };
@@ -310,6 +362,234 @@ export default function RegionalHeadDashboard() {
             </div>
           </div>
         ))}
+      </div>
+
+      {/* ========================================================================= */}
+      {/* SAP HANA CLOUD EXECUTIVE WAREHOUSE BENTO CARD                              */}
+      {/* ========================================================================= */}
+      <div className="rounded-xl bg-abyss-card border border-sand-border p-5 shadow-sm space-y-4">
+        {/* Card Header with Connection Badge, Timestamp & Taxi Volt Sync CTA */}
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 border-b border-sand-border pb-4">
+          <div className="space-y-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <Database className="w-5 h-5 text-volt" />
+              <h3 className="text-base sm:text-lg font-bold text-abyss-text tracking-tight font-sans">
+                SAP HANA Cloud Executive Warehouse
+              </h3>
+              <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-abyss-elevated border border-sand-border text-[11px] font-mono font-bold">
+                <span className={`w-2 h-2 rounded-full ${hanaAnalytics?.connected ? 'bg-emerald-500 animate-pulse' : 'bg-volt animate-ping'}`} />
+                <span className="text-abyss-text">
+                  SAP HANA Cloud · {hanaAnalytics?.schema || 'HACKFEST0418'} · {hanaAnalytics?.connected ? 'Live' : 'Standby Cache'}
+                </span>
+              </div>
+            </div>
+            <p className="text-xs text-abyss-muted font-mono">
+              Cloud columnar single source of truth: tables <code className="text-abyss-text font-bold">PULSECHAIN_RISK_SNAPSHOTS</code>, <code className="text-abyss-text font-bold">PULSECHAIN_SUPPLIER_SLA</code>, and analytics view <code className="text-abyss-text font-bold">V_REGIONAL_EXEC_SUMMARY</code>.
+            </p>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2.5 self-start lg:self-center">
+            <span className="text-[11px] font-mono text-abyss-muted">
+              Last updated: {lastUpdated}
+            </span>
+            <button
+              type="button"
+              onClick={handleSyncHanaCloud}
+              disabled={syncingHana}
+              className="flex items-center space-x-2 px-4 py-2 rounded-xl text-xs font-mono font-bold bg-volt text-volt-text hover:bg-volt-hover active:scale-95 transition-all shadow-sm focus-visible:ring-2 focus-visible:ring-[#FFD400] disabled:opacity-50"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 text-volt-text ${syncingHana ? 'animate-spin' : ''}`} />
+              <span>{syncingHana ? 'Syncing to HANA Cloud...' : 'Sync S/4HANA Snapshot to HANA Cloud'}</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Inline Feedback Banner */}
+        {hanaSyncStatus && (
+          <div
+            className={`p-3 rounded-xl border text-xs font-mono flex items-center justify-between gap-2 ${
+              hanaSyncStatus.type === 'success'
+                ? 'bg-sand-base text-sand-text border-sand-border'
+                : 'bg-red-500/10 border-red-500/30 text-red-300'
+            }`}
+          >
+            <div className="flex items-center gap-2">
+              {hanaSyncStatus.type === 'success' ? (
+                <CheckCircle2 className="w-4 h-4 text-emerald-700 dark:text-volt shrink-0" />
+              ) : (
+                <AlertTriangle className="w-4 h-4 text-red-400 shrink-0" />
+              )}
+              <span>{hanaSyncStatus.message}</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setHanaSyncStatus(null)}
+              className="text-abyss-muted hover:text-abyss-text p-1"
+              aria-label="Dismiss message"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        )}
+
+        {/* Loading Skeletons */}
+        {loadingHana && !hanaAnalytics && (
+          <div className="space-y-3 animate-pulse">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <div className="h-28 bg-abyss-elevated rounded-xl border border-sand-border"></div>
+              <div className="h-28 bg-abyss-elevated rounded-xl border border-sand-border"></div>
+              <div className="h-28 bg-abyss-elevated rounded-xl border border-sand-border"></div>
+            </div>
+            <div className="h-36 bg-abyss-elevated rounded-xl border border-sand-border"></div>
+          </div>
+        )}
+
+        {/* City-by-City Summary Cards from V_REGIONAL_EXEC_SUMMARY */}
+        {hanaAnalytics && (
+          <div className="space-y-4">
+            <div>
+              <div className="flex items-center justify-between text-xs font-mono mb-2">
+                <span className="font-bold text-abyss-text uppercase tracking-wider flex items-center gap-1.5">
+                  <Building2 className="w-3.5 h-3.5 text-volt" />
+                  <span>City Executive Aggregations (V_REGIONAL_EXEC_SUMMARY)</span>
+                </span>
+                <span className="text-[10px] text-abyss-muted font-mono">
+                  Calculated natively in SAP HANA Cloud
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                {(hanaAnalytics.regionalSummary || []).map((summary) => {
+                  const hasCritical = Number(summary.CRITICAL_ALERTS) > 0;
+                  return (
+                    <div
+                      key={summary.CITY}
+                      className="p-4 rounded-xl bg-abyss-elevated border border-sand-border space-y-2 hover:border-volt/40 transition-colors"
+                    >
+                      <div className="flex items-center justify-between border-b border-sand-border pb-2">
+                        <span className="font-mono font-bold text-xs text-abyss-text flex items-center gap-1.5">
+                          <MapPin className="w-3.5 h-3.5 text-volt" />
+                          <span>{summary.CITY} HUB</span>
+                        </span>
+                        <span
+                          className={`text-[10px] px-2 py-0.5 rounded font-mono font-bold ${
+                            hasCritical ? 'bg-volt text-volt-text font-black' : 'bg-sand-base text-sand-text'
+                          }`}
+                        >
+                          {hasCritical ? `${summary.CRITICAL_ALERTS} Critical Alerts` : 'Stable Buffer'}
+                        </span>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-2 text-xs font-mono pt-1">
+                        <div>
+                          <span className="text-[10px] text-abyss-muted block">Monitored Hospitals</span>
+                          <strong className="text-sm font-black text-abyss-text">
+                            {summary.MONITORED_HOSPITALS} Facilities
+                          </strong>
+                        </div>
+                        <div>
+                          <span className="text-[10px] text-abyss-muted block">Avg Days Cover</span>
+                          <strong className="text-sm font-black text-abyss-text dark:text-volt">
+                            {summary.AVG_DAYS_COVER}d Buffer
+                          </strong>
+                        </div>
+                        <div>
+                          <span className="text-[10px] text-abyss-muted block">Critical Alerts</span>
+                          <strong className={`text-sm font-black ${hasCritical ? 'text-volt' : 'text-emerald-700 dark:text-emerald-400'}`}>
+                            {summary.CRITICAL_ALERTS} Materials
+                          </strong>
+                        </div>
+                        <div>
+                          <span className="text-[10px] text-abyss-muted block">High-Risk Events</span>
+                          <strong className={`text-sm font-black ${Number(summary.HIGH_RISK_EVENTS) > 0 ? 'text-amber-700 dark:text-amber-400' : 'text-abyss-text'}`}>
+                            {summary.HIGH_RISK_EVENTS} Disruptions
+                          </strong>
+                        </div>
+                      </div>
+
+                      <div className="text-[9px] font-mono text-abyss-muted border-t border-sand-border pt-1 flex justify-between">
+                        <span>HANA View Node: {summary.CITY}</span>
+                        <span>{summary.LAST_SYNCED_AT || summary.LAST_SNAPSHOT_AT ? new Date(summary.LAST_SYNCED_AT || summary.LAST_SNAPSHOT_AT).toLocaleTimeString() : 'Live'}</span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Recent Supplier SLA & Delay Variance Table from PULSECHAIN_SUPPLIER_SLA */}
+            <div className="space-y-2 pt-2">
+              <div className="flex items-center justify-between text-xs font-mono">
+                <span className="font-bold text-abyss-text uppercase tracking-wider flex items-center gap-1.5">
+                  <Truck className="w-3.5 h-3.5 text-volt" />
+                  <span>Recent Supplier SLA & Delay Variance Ledger (PULSECHAIN_SUPPLIER_SLA)</span>
+                </span>
+                <span className="text-[11px] text-abyss-muted">
+                  Latest {hanaAnalytics.supplierSlaMetrics?.length || 0} HANA Cloud SLA Records
+                </span>
+              </div>
+
+              <div className="overflow-x-auto rounded-xl border border-sand-border">
+                <table className="w-full text-left font-mono text-xs">
+                  <thead>
+                    <tr className="border-b border-sand-border text-[10px] text-abyss-muted uppercase tracking-wider bg-abyss-elevated">
+                      <th className="py-2.5 px-3">Supplier ID</th>
+                      <th className="py-2.5 px-3">Material</th>
+                      <th className="py-2.5 px-3 text-center">TrustScore & Tier</th>
+                      <th className="py-2.5 px-3 text-center">OSRM Transit vs Promised</th>
+                      <th className="py-2.5 px-3 text-center">Delay SLA Flag</th>
+                      <th className="py-2.5 px-3">Delay Reason / SLA Justification</th>
+                      <th className="py-2.5 px-3 text-right">Recorded At</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-sand-border">
+                    {(hanaAnalytics.supplierSlaMetrics || []).map((sla, idx) => {
+                      const isDelayed = sla.DELAY_FLAG === 'Y';
+                      return (
+                        <tr key={sla.ID || idx} className="hover:bg-abyss-elevated transition-colors">
+                          <td className="py-2.5 px-3 font-bold text-abyss-text">
+                            <span className="px-1.5 py-0.5 rounded bg-abyss-elevated border border-sand-border text-[11px]">
+                              {sla.SUPPLIER_ID}
+                            </span>
+                          </td>
+                          <td className="py-2.5 px-3 text-volt font-bold">{sla.MATERIAL_ID}</td>
+                          <td className="py-2.5 px-3 text-center">
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-abyss-elevated border border-sand-border text-abyss-text dark:text-volt">
+                              <span>{sla.SUPPLIER_TIER || 'GOLD'}</span>
+                              <span className="text-abyss-muted">({sla.TRUST_SCORE || 85.0})</span>
+                            </span>
+                          </td>
+                          <td className="py-2.5 px-3 text-center text-abyss-text">
+                            <span>{sla.OSRM_TRAVEL_DAYS}d OSRM</span>
+                            <span className="text-abyss-muted mx-1">→</span>
+                            <span className={isDelayed ? 'text-volt font-bold' : 'text-abyss-text'}>
+                              {sla.PROMISED_LEAD_DAYS}d Lead
+                            </span>
+                          </td>
+                          <td className="py-2.5 px-3 text-center">
+                            <span
+                              className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                                isDelayed ? 'bg-volt text-volt-text font-black' : 'bg-sand-base text-sand-text'
+                              }`}
+                            >
+                              {isDelayed ? 'DELAYED (Y)' : 'ON-TIME (N)'}
+                            </span>
+                          </td>
+                          <td className="py-2.5 px-3 text-abyss-muted max-w-xs truncate" title={sla.DELAY_REASON}>
+                            {sla.DELAY_REASON || 'On-schedule transit'}
+                          </td>
+                          <td className="py-2.5 px-3 text-right text-abyss-muted text-[10px]">
+                            {sla.RECORDED_AT ? new Date(sla.RECORDED_AT).toLocaleTimeString() : 'Recent'}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Tabs Navigation & City Filter */}

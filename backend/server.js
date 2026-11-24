@@ -29,10 +29,13 @@ if (process.env.GEMINI_API_KEY) {
 // Live Gateway Endpoint: https://merida.cob.csuchico.edu:8038/sap/opu/odata/sap/ZPLUSE_SRV?sap-client=105
 const sapAdapter = require('./sapAdapter');
 
+// SAP HANA Cloud Analytics Warehouse (Hackfest0418)
+const hanaCloudService = require('./hanaCloudService');
+
 // Supabase Auth, PostgreSQL RLS & External Services
 const { requireAuth, requireRole, ROLE_ALIASES } = require('./authMiddleware');
 const { calculateRoute } = require('./geoRoutingService');
-const { getExternalRisk, recommendSuppliers } = require('./externalSensingService');
+const { getExternalRisk, recommendSuppliers, fetchOpenMeteoWeather } = require('./externalSensingService');
 const {
   logStockAuditToSupabase,
   logReallocationToSupabase,
@@ -1090,7 +1093,7 @@ app.get('/api/open-shortages', (req, res) => {
  * If leadTime > maxAllowedLeadDays, requires delayReason (min 5 characters).
  * Calls SAP Gateway OData v2 Z_PULSE_SUBMIT_BID and updates in-memory supplier proposals.
  */
-app.post('/api/supplier-bid', verifyRole(['SUPPLIER', 'INVENTORY_MANAGER', 'HOSPITAL_MANAGER', 'REGIONAL_ADMIN']), async (req, res) => {
+app.post(['/api/supplier-bid', '/api/bids'], verifyRole(['SUPPLIER', 'INVENTORY_MANAGER', 'HOSPITAL_MANAGER', 'REGIONAL_ADMIN']), async (req, res) => {
   let supplierId = req.body.supplierId || req.body.supplier_id;
   let materialId = req.body.materialId || req.body.material_id;
   let unitCost = req.body.unitCost !== undefined ? req.body.unitCost : req.body.unit_cost;
@@ -1187,6 +1190,19 @@ app.post('/api/supplier-bid', verifyRole(['SUPPLIER', 'INVENTORY_MANAGER', 'HOSP
   supplierBids.unshift(newBid);
   sapAdapter.logSupplierBid(newBid);
   await createSupplierBidInSupabase(newBid).catch((e) => console.warn('[Supabase Bid] Sync note:', e.message));
+
+  // Non-blocking Auto-Log into SAP HANA Cloud PULSECHAIN_SUPPLIER_SLA
+  const osrmTravelDays = routeInfo ? Math.max(1, Math.ceil((routeInfo.durationHours || 0) / 24)) : 1;
+  hanaCloudService.recordSupplierSla({
+    supplierId,
+    materialId,
+    trustScore: 88.0,
+    supplierTier: complianceFlag === 'Y' ? 'GOLD' : 'BLOCKED',
+    osrmTravelDays,
+    promisedLeadDays: numericLead,
+    delayFlag: numericLead > osrmTravelDays + 1 ? 'Y' : 'N',
+    delayReason: delayReason || 'Proposal registered via Supplier Portal',
+  }).catch((err) => console.warn('[HANA Cloud Auto-Log] Supplier bid SLA note:', err.message));
 
   // Update or insert into currentSuppliersState so Manager immediately sees the bid on Screen 3
   const existingSupplierIdx = currentSuppliersState.findIndex(
@@ -1812,6 +1828,18 @@ app.post('/api/reviews', verifyRole(['HOSPITAL_MANAGER', 'INVENTORY_MANAGER', 'R
 
   await updateShipmentApprovalInSupabase(shipment.id, { review_submitted: true });
 
+  // Non-blocking Auto-Log into SAP HANA Cloud PULSECHAIN_SUPPLIER_SLA
+  hanaCloudService.recordSupplierSla({
+    supplierId: shipment.supplier_id,
+    materialId: shipment.material_id,
+    trustScore: sapResult.trustScore || 85.0,
+    supplierTier: sapResult.supplierTier || 'GOLD',
+    osrmTravelDays: 1.0,
+    promisedLeadDays: 1.0,
+    delayFlag: Number(delivery_speed) < 70 ? 'Y' : 'N',
+    delayReason: comments || 'Post-delivery performance review logged in SAP',
+  }).catch((err) => console.warn('[HANA Cloud Auto-Log] Supplier review SLA note:', err.message));
+
   return res.status(201).json({
     success: true,
     message: 'Post-delivery review recorded and synchronized to SAP S/4HANA Supplier Ledger.',
@@ -1955,14 +1983,29 @@ app.post('/api/reset', async (req, res) => {
 /**
  * GET /api/sap/status
  * Health check & diagnostic report for SAP S/4HANA Gateway OData v2 (ZPLUSE_SRV)
- * Ping ${SAP_ODATA_URL}/InventorySet?sap-client=${SAP_CLIENT}&$top=1&$format=json
+ * Alongside live SAP HANA Cloud analytics warehouse connectivity status.
  */
 app.get('/api/sap/status', async (req, res) => {
   const status = await sapAdapter.getSapStatus();
+  const hanaPing = await hanaCloudService.pingHanaCloud();
+  const hanaStatus = {
+    connected: hanaPing.connected,
+    engine: 'SAP HANA Cloud',
+    schema: process.env.HANA_USER || 'Hackfest0418',
+    host: hanaPing.host || process.env.HANA_HOST || 'hackfest0418.hana.prod-eu10.hanacloud.ondemand.com',
+    port: process.env.HANA_PORT || 443,
+    status: hanaPing.status || (hanaPing.connected ? 'ONLINE' : 'PAUSED_OR_STANDBY'),
+    timestamp: hanaPing.timestamp,
+  };
+
   return res.status(200).json({
     success: true,
     ...status,
-    data: status,
+    hanaCloud: hanaStatus,
+    data: {
+      ...status,
+      hanaCloud: hanaStatus,
+    },
   });
 });
 
@@ -1972,11 +2015,19 @@ app.get('/api/sap/status', async (req, res) => {
  */
 app.get('/api/status', async (req, res) => {
   const sapStatus = await sapAdapter.getSapStatus();
+  const hanaPing = await hanaCloudService.pingHanaCloud();
+  const hanaStatus = {
+    connected: hanaPing.connected,
+    engine: 'SAP HANA Cloud',
+    schema: process.env.HANA_USER || 'Hackfest0418',
+  };
+
   res.status(200).json({
     system: 'PulseChain Resilience Engine',
-    version: '3.1.0 (SAP S/4HANA OData Edition)',
+    version: '3.1.0 (SAP S/4HANA OData & HANA Cloud Edition)',
     status: 'ONLINE',
     sapStatus: sapStatus,
+    hanaCloud: hanaStatus,
     sapConfig: {
       odataUrl: process.env.SAP_ODATA_URL || 'https://merida.cob.csuchico.edu:8038/sap/opu/odata/sap/ZPLUSE_SRV',
       client: process.env.SAP_CLIENT || '105',
@@ -1995,6 +2046,121 @@ app.get('/api/status', async (req, res) => {
     activeBidsCount: supplierBids.length,
   });
 });
+
+// =========================================================================
+// 8B. SAP HANA CLOUD EXECUTIVE WAREHOUSE ENDPOINTS
+// =========================================================================
+
+/**
+ * GET /api/analytics/hana-cloud
+ * Returns live output of getRegionalExecutiveAnalytics() from SAP HANA Cloud:
+ * V_REGIONAL_EXEC_SUMMARY, latest 15 PULSECHAIN_RISK_SNAPSHOTS, and PULSECHAIN_SUPPLIER_SLA.
+ * Access: REGIONAL_HEAD, REGIONAL_ADMIN, HOSPITAL_MANAGER, INVENTORY_MANAGER
+ */
+app.get(
+  '/api/analytics/hana-cloud',
+  verifyRole(['REGIONAL_HEAD', 'REGIONAL_ADMIN', 'HOSPITAL_MANAGER', 'INVENTORY_MANAGER']),
+  async (req, res) => {
+    try {
+      const analytics = await hanaCloudService.getRegionalExecutiveAnalytics();
+      return res.status(200).json(analytics);
+    } catch (err) {
+      console.error('[HANA Cloud API Error]:', err);
+      return res.status(500).json({
+        success: false,
+        error: err.message,
+      });
+    }
+  }
+);
+
+/**
+ * POST /api/analytics/hana-cloud/sync
+ * Pulls current live inventory from SAP S/4HANA (ZPLUSE_SRV/InventorySet),
+ * pairs it with live Open-Meteo weather / external risk, and writes fresh snapshot
+ * rows into SAP HANA Cloud PULSECHAIN_RISK_SNAPSHOTS, returning updated analytics.
+ * Access: REGIONAL_HEAD, REGIONAL_ADMIN, HOSPITAL_MANAGER, INVENTORY_MANAGER
+ */
+app.post(
+  '/api/analytics/hana-cloud/sync',
+  verifyRole(['REGIONAL_HEAD', 'REGIONAL_ADMIN', 'HOSPITAL_MANAGER', 'INVENTORY_MANAGER']),
+  async (req, res) => {
+    try {
+      // 1. Fetch live inventory from SAP S/4HANA
+      let items = currentStockState;
+      try {
+        const liveSap = await sapAdapter.getInventory();
+        if (liveSap && liveSap.length > 0) {
+          items = liveSap;
+        }
+      } catch (sapErr) {
+        console.warn('[HANA Cloud Sync] SAP live fetch note:', sapErr.message);
+      }
+
+      // City Coordinates for Open-Meteo weather sensing
+      const CITY_COORDS = {
+        BHOPAL: { lat: 23.2599, lon: 77.4126 },
+        INDORE: { lat: 22.7196, lon: 75.8577 },
+        JABALPUR: { lat: 23.1815, lon: 79.9864 },
+      };
+
+      // 2. Pair active records with live weather & record snapshots
+      let syncedCount = 0;
+      const sampleItems = items.slice(0, 12);
+
+      for (const item of sampleItems) {
+        const city = (item.CITY || 'BHOPAL').toUpperCase();
+        const coords = CITY_COORDS[city] || CITY_COORDS.BHOPAL;
+        let weather = { temperature: 28.5 };
+        try {
+          weather = await fetchOpenMeteoWeather(coords.lat, coords.lon);
+        } catch (wErr) {}
+
+        const stockQty = Number(item.CURRENT_STOCK) || 1000;
+        const dailyUse = Number(item.DAILY_USE) || 100;
+        const daysCover = dailyUse > 0 ? Number((stockQty / dailyUse).toFixed(1)) : 10;
+
+        let externalRisk = 'LOW';
+        if (weather.temperature > 35) externalRisk = 'HEATWAVE_EXCURSION';
+        else if (weather.precipitation > 5) externalRisk = 'PRECIPITATION_RISK';
+        else if (weather.windSpeed > 30) externalRisk = 'HIGH_WIND_WARNING';
+
+        let deliveryImpact = 'ON_TIME';
+        if (daysCover < 7) deliveryImpact = 'CRITICAL_SHORTAGE';
+        else if (daysCover < 12) deliveryImpact = 'DELAY_SENSITIVE';
+
+        await hanaCloudService.recordRiskSnapshot({
+          city,
+          hospitalId: item.HOSPITAL_ID || 'H004',
+          materialId: item.MATERIAL_ID || 'GEN001',
+          stockQty,
+          dailyUse,
+          daysCover,
+          externalRisk,
+          deliveryImpact,
+          weatherTempC: weather.temperature,
+        });
+        syncedCount++;
+      }
+
+      // 3. Return updated regional executive analytics
+      const updatedAnalytics = await hanaCloudService.getRegionalExecutiveAnalytics();
+
+      return res.status(200).json({
+        success: true,
+        message: `Successfully synchronized ${syncedCount} SAP S/4HANA inventory records with live Open-Meteo sensing into SAP HANA Cloud.`,
+        syncedRecords: syncedCount,
+        analytics: updatedAnalytics,
+      });
+    } catch (err) {
+      console.error('[HANA Cloud Sync Error]:', err);
+      return res.status(500).json({
+        success: false,
+        error: err.message,
+      });
+    }
+  }
+);
 
 // Extract JSON helper from LLM response
 function extractJson(text) {
@@ -2450,6 +2616,34 @@ Instructions:
         }
       }
     }
+
+    // Non-blocking Auto-Log into SAP HANA Cloud PULSECHAIN_RISK_SNAPSHOTS
+    (async () => {
+      try {
+        const city = (req.body && req.body.city) || 'BHOPAL';
+        const hospitalId = (req.body && req.body.hospitalId) || 'H004';
+        const materialId = executionPlan?.materialId || 'OXY005';
+        const stockQty = executionPlan?.qty || 1500;
+        const daysCover = impactResult?.criticalShortages?.[0]?.daysCover || 4.2;
+        const externalRisk = alertText ? 'AI_ALERT_ACTIVE' : 'MONITORED';
+        const deliveryImpact = executionPlan ? 'EXECUTION_PENDING' : 'ANALYZED';
+        const weatherTempC = sensingResult?.weather?.temperature || 28.5;
+
+        await hanaCloudService.recordRiskSnapshot({
+          city,
+          hospitalId,
+          materialId,
+          stockQty,
+          dailyUse: 120,
+          daysCover,
+          externalRisk,
+          deliveryImpact,
+          weatherTempC,
+        });
+      } catch (err) {
+        console.warn('[HANA Cloud Auto-Log] analyze-disruption hook note:', err.message);
+      }
+    })().catch(() => {});
 
     return res.status(200).json({
       success: true,

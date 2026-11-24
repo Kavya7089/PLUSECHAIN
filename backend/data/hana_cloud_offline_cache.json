@@ -1,0 +1,136 @@
+{
+  "regionalSummary": [
+    {
+      "CITY": "BHOPAL",
+      "MONITORED_HOSPITALS": 2,
+      "TOTAL_SNAPSHOTS": 3,
+      "AVG_DAYS_COVER": "13.00",
+      "CRITICAL_ALERTS": 1,
+      "HIGH_RISK_EVENTS": 1,
+      "LAST_SYNCED_AT": "2026-11-24T11:53:06.678"
+    },
+    {
+      "CITY": "JABALPUR",
+      "MONITORED_HOSPITALS": 1,
+      "TOTAL_SNAPSHOTS": 1,
+      "AVG_DAYS_COVER": "3.00",
+      "CRITICAL_ALERTS": 1,
+      "HIGH_RISK_EVENTS": 0,
+      "LAST_SYNCED_AT": "2026-11-24T11:53:06.715"
+    },
+    {
+      "CITY": "INDORE",
+      "MONITORED_HOSPITALS": 1,
+      "TOTAL_SNAPSHOTS": 1,
+      "AVG_DAYS_COVER": "6.00",
+      "CRITICAL_ALERTS": 0,
+      "HIGH_RISK_EVENTS": 0,
+      "LAST_SYNCED_AT": "2026-11-24T11:53:06.696"
+    }
+  ],
+  "riskSnapshots": [
+    {
+      "SNAPSHOT_ID": 5,
+      "CITY": "JABALPUR",
+      "HOSPITAL_ID": "H003",
+      "MATERIAL_ID": "SAL500",
+      "STOCK_QTY": "300.00",
+      "DAILY_USE": "100.00",
+      "DAYS_COVER": "3.00",
+      "EXTERNAL_RISK": "MEDIUM",
+      "DELIVERY_IMPACT": "DELAYED",
+      "WEATHER_TEMP_C": "35.00",
+      "RECORDED_AT": "2026-11-24T11:53:06.715"
+    },
+    {
+      "SNAPSHOT_ID": 4,
+      "CITY": "INDORE",
+      "HOSPITAL_ID": "H002",
+      "MATERIAL_ID": "INS001",
+      "STOCK_QTY": "450.00",
+      "DAILY_USE": "75.00",
+      "DAYS_COVER": "6.00",
+      "EXTERNAL_RISK": "LOW",
+      "DELIVERY_IMPACT": "ON_TIME",
+      "WEATHER_TEMP_C": "32.10",
+      "RECORDED_AT": "2026-11-24T11:53:06.696"
+    },
+    {
+      "SNAPSHOT_ID": 3,
+      "CITY": "BHOPAL",
+      "HOSPITAL_ID": "H005",
+      "MATERIAL_ID": "INS001",
+      "STOCK_QTY": "4500.00",
+      "DAILY_USE": "150.00",
+      "DAYS_COVER": "30.00",
+      "EXTERNAL_RISK": "LOW",
+      "DELIVERY_IMPACT": "ON_TIME",
+      "WEATHER_TEMP_C": "33.80",
+      "RECORDED_AT": "2026-11-24T11:53:06.678"
+    },
+    {
+      "SNAPSHOT_ID": 2,
+      "CITY": "BHOPAL",
+      "HOSPITAL_ID": "H004",
+      "MATERIAL_ID": "OXY005",
+      "STOCK_QTY": "8.00",
+      "DAILY_USE": "2.00",
+      "DAYS_COVER": "4.00",
+      "EXTERNAL_RISK": "MEDIUM",
+      "DELIVERY_IMPACT": "ON_TIME",
+      "WEATHER_TEMP_C": "34.50",
+      "RECORDED_AT": "2026-11-24T11:53:06.655"
+    },
+    {
+      "SNAPSHOT_ID": 1,
+      "CITY": "BHOPAL",
+      "HOSPITAL_ID": "H004",
+      "MATERIAL_ID": "INS001",
+      "STOCK_QTY": "150.00",
+      "DAILY_USE": "30.00",
+      "DAYS_COVER": "5.00",
+      "EXTERNAL_RISK": "HIGH",
+      "DELIVERY_IMPACT": "DELAYED",
+      "WEATHER_TEMP_C": "34.50",
+      "RECORDED_AT": "2026-11-24T11:53:06.625"
+    }
+  ],
+  "supplierSla": [
+    {
+      "SLA_ID": 3,
+      "SUPPLIER_ID": "V1003",
+      "MATERIAL_ID": "OXY005",
+      "TRUST_SCORE": "75.55",
+      "SUPPLIER_TIER": "BLOCKED",
+      "OSRM_TRAVEL_DAYS": 2,
+      "PROMISED_LEAD_DAYS": 4,
+      "DELAY_FLAG": "Y",
+      "DELAY_REASON": "Non-compliant cold-chain certification",
+      "RECORDED_AT": "2026-11-24T11:53:06.779"
+    },
+    {
+      "SLA_ID": 2,
+      "SUPPLIER_ID": "V1002",
+      "MATERIAL_ID": "INS001",
+      "TRUST_SCORE": "84.70",
+      "SUPPLIER_TIER": "GOLD",
+      "OSRM_TRAVEL_DAYS": 2,
+      "PROMISED_LEAD_DAYS": 5,
+      "DELAY_FLAG": "Y",
+      "DELAY_REASON": "Cold-chain reefer inspection hold",
+      "RECORDED_AT": "2026-11-24T11:53:06.762"
+    },
+    {
+      "SLA_ID": 1,
+      "SUPPLIER_ID": "V1001",
+      "MATERIAL_ID": "INS001",
+      "TRUST_SCORE": "94.60",
+      "SUPPLIER_TIER": "PLATINUM",
+      "OSRM_TRAVEL_DAYS": 1,
+      "PROMISED_LEAD_DAYS": 2,
+      "DELAY_FLAG": "N",
+      "DELAY_REASON": "",
+      "RECORDED_AT": "2026-11-24T11:53:06.74"
+    }
+  ]
+}
