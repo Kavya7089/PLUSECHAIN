@@ -1,41 +1,68 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import axios from 'axios';
 import { usePulseChain } from '../context/PulseChainContext';
+import DeliveryRouteMap from './DeliveryRouteMap';
+import CopyButton from './common/CopyButton';
+import ConfirmModal from './common/ConfirmModal';
 import {
   Truck,
   Package,
   Clock,
-  DollarSign,
   ShieldCheck,
   ShieldAlert,
   Send,
   RefreshCw,
   AlertTriangle,
   CheckCircle2,
-  Sparkles,
   Building2,
-  Layers,
   ArrowRight,
-  TrendingUp,
-  XCircle,
+  MapPin,
+  Navigation,
 } from 'lucide-react';
 
-const API_BASE_URL = 'http://localhost:5000/api';
+const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000') + '/api';
 
 export default function SupplierPortal() {
   const { user, openShortages, fetchOpenShortages, fetchSuppliers } = usePulseChain();
 
-  const assignedSupplierId = user?.supplierId || 'V1001';
+  const assignedSupplierId = user?.supplierId || user?.supplier_id || 'V1001';
 
   // Proposal Form State
   const [selectedMaterial, setSelectedMaterial] = useState('');
+  const [targetHospitalId, setTargetHospitalId] = useState('H004');
   const [unitCost, setUnitCost] = useState(85);
   const [leadTime, setLeadTime] = useState(2);
   const [capacity, setCapacity] = useState(6000);
   const [compliance, setCompliance] = useState('Y');
+  const [delayReason, setDelayReason] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [submitResult, setSubmitResult] = useState(null);
   const [myBids, setMyBids] = useState([]);
+  const [supplierSapMetrics, setSupplierSapMetrics] = useState(null);
+
+  // ConfirmModal State
+  const [confirmModalOpen, setConfirmModalOpen] = useState(false);
+
+  // Fetch supplier SAP metrics
+  const fetchSupplierSapMetrics = async () => {
+    try {
+      const res = await axios.get(`${API_BASE_URL}/suppliers`);
+      if (res.data?.success && res.data.data) {
+        const found = res.data.data.find(
+          (s) => (s.SUPPLIER_ID || s.supplierId) === assignedSupplierId
+        );
+        if (found) {
+          setSupplierSapMetrics(found);
+        }
+      }
+    } catch (err) {
+      console.warn('Failed to load supplier SAP metrics:', err.message);
+    }
+  };
+
+  // OSRM Route & +1 Day Guardrail State
+  const [routeInfo, setRouteInfo] = useState(null);
+  const [loadingRoute, setLoadingRoute] = useState(false);
 
   // Fetch bids submitted by this supplier
   const fetchMyBids = async () => {
@@ -47,24 +74,68 @@ export default function SupplierPortal() {
     }
   };
 
+  // Fetch route between this supplier and the target hospital
+  const fetchRoute = async (hId) => {
+    const dest = hId || targetHospitalId || 'H004';
+    setLoadingRoute(true);
+    try {
+      const res = await axios.get(`${API_BASE_URL}/route/${assignedSupplierId}/${dest}`);
+      if (res.data?.success && res.data.route) {
+        setRouteInfo(res.data.route);
+      }
+    } catch (err) {
+      console.warn('Route lookup error:', err.message);
+    } finally {
+      setLoadingRoute(false);
+    }
+  };
+
   useEffect(() => {
     fetchMyBids();
+    fetchSupplierSapMetrics();
     if (openShortages.length > 0 && !selectedMaterial) {
       setSelectedMaterial(openShortages[0].materialId);
+      setTargetHospitalId(openShortages[0].hospitalId || 'H004');
+      fetchRoute(openShortages[0].hospitalId || 'H004');
+    } else {
+      fetchRoute(targetHospitalId);
     }
   }, [openShortages]);
 
   // Handle selecting an RFQ from the table to bid on
   const handleSelectRfq = (rfq) => {
     setSelectedMaterial(rfq.materialId);
+    setTargetHospitalId(rfq.hospitalId || 'H004');
+    fetchRoute(rfq.hospitalId || 'H004');
     setSubmitResult(null);
-    window.scrollTo({ top: 300, behavior: 'smooth' });
   };
 
-  // Submit Bid
-  const handleSubmitBid = async (e) => {
+  // Calculate Max Allowed Lead Days from OSRM Duration: durationHours / 24 + 1
+  const maxAllowedLeadDays = useMemo(() => {
+    if (!routeInfo) return 2;
+    return Math.ceil((routeInfo.durationHours || 0) / 24) + 1;
+  }, [routeInfo]);
+
+  const isDelayExceeded = Number(leadTime) > maxAllowedLeadDays;
+  const isDelayReasonValid = !isDelayExceeded || (delayReason && delayReason.trim().length >= 5);
+
+  const handleFormSubmit = (e) => {
     e.preventDefault();
     if (!selectedMaterial) return;
+
+    if (isDelayExceeded && !isDelayReasonValid) {
+      setSubmitResult({
+        type: 'error',
+        message: `Proposed lead time (${leadTime}d) exceeds maximum allowable transit duration (${maxAllowedLeadDays}d). Mandatory delay justification (minimum 5 characters) is required.`,
+      });
+      return;
+    }
+
+    setConfirmModalOpen(true);
+  };
+
+  // Execute Submit Bid after Confirmation
+  const executeSubmitBid = async () => {
     setSubmitting(true);
     setSubmitResult(null);
 
@@ -72,19 +143,22 @@ export default function SupplierPortal() {
       const response = await axios.post(`${API_BASE_URL}/supplier-bid`, {
         supplierId: assignedSupplierId,
         materialId: selectedMaterial,
+        hospitalId: targetHospitalId,
         unitCost: parseFloat(unitCost),
         leadTime: parseFloat(leadTime),
         capacity: parseFloat(capacity),
         compliance: compliance,
+        delayReason: isDelayExceeded ? delayReason.trim() : null,
       });
 
       if (response.data.success) {
         setSubmitResult({
           type: 'success',
-          message: 'Proposal successfully logged in SAP Procurement Ledger (Z_PULSE_SUBMIT_BID)!',
+          message: 'Proposal successfully recorded in SAP Procurement Ledger (Z_PULSE_SUBMIT_BID)!',
           bid: response.data.bid,
         });
 
+        setDelayReason('');
         await fetchMyBids();
         await fetchSuppliers();
       }
@@ -99,72 +173,131 @@ export default function SupplierPortal() {
   };
 
   return (
-    <div className="space-y-6 max-w-7xl mx-auto animate-in fade-in duration-300">
-      {/* Top Banner: Supplier Profile */}
-      <div className="glass-panel p-5 rounded-3xl border border-[#e0e8e2]/15 bg-gradient-to-r from-[#2c2e35]/95 via-[#2a3f3f]/85 to-[#2c2e35]/95 shadow-xl">
+    <div className="space-y-5 max-w-7xl mx-auto text-abyss-text font-sans">
+      {/* Top Bento Header: Supplier Profile */}
+      <div className="rounded-xl bg-abyss-card border border-sand-border p-5 shadow-sm">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="flex items-center space-x-3.5">
-            <div className="p-3 rounded-2xl bg-[#467750]/30 border border-[#89c07e]/40 text-[#89c07e]">
+            <div className="p-3 rounded-xl bg-abyss-elevated border border-sand-border text-volt">
               <Truck className="w-6 h-6" />
             </div>
             <div>
               <div className="flex items-center space-x-2">
-                <h2 className="text-xl sm:text-2xl font-black text-white tracking-tight">
+                <h2 className="text-xl sm:text-2xl font-black text-abyss-text tracking-tight">
                   Emergency Supplier Bidding Portal
                 </h2>
-                <span className="text-[10px] font-mono font-bold px-2.5 py-0.5 rounded-full bg-[#89c07e] text-[#2c2e35]">
+                <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-volt text-volt-text">
                   SAP ET_SUPPLIERS
                 </span>
               </div>
-              <p className="text-xs text-[#e0e8e2]/70 font-mono mt-0.5">
-                Vendor: <strong className="text-white">{assignedSupplierId} (BioPharm Logistics)</strong> • Commercial Rep:{' '}
-                <strong className="text-[#89c07e]">{user?.name || 'Saumay Dubey'}</strong> • SLA:{' '}
-                <strong className="text-[#89c07e]">98%</strong> • Quality:{' '}
-                <strong className="text-[#89c07e]">GAMP Cold-Chain Certified</strong>
+              <p className="text-xs text-abyss-muted font-mono mt-0.5">
+                Vendor: <strong className="text-abyss-text">{assignedSupplierId} (BioPharm Logistics)</strong> • Commercial Rep:{' '}
+                <strong className="text-volt">{user?.name || 'Saumay Dubey'}</strong> • SLA:{' '}
+                <strong className="text-abyss-text">98%</strong> • Quality:{' '}
+                <strong className="text-abyss-text">GAMP Cold-Chain Certified</strong>
               </p>
             </div>
           </div>
 
           <div className="flex items-center space-x-2 self-start md:self-center">
             <button
+              type="button"
               onClick={() => {
                 fetchOpenShortages();
                 fetchMyBids();
               }}
-              className="flex items-center space-x-1.5 px-3 py-2 rounded-xl text-xs font-mono bg-[#2a3f3f]/60 border border-[#e0e8e2]/15 text-[#e0e8e2] hover:border-[#89c07e]/50 transition-all"
+              className="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl text-xs font-mono bg-abyss-elevated border border-sand-border text-abyss-text hover:border-volt transition-colors"
             >
-              <RefreshCw className="w-3.5 h-3.5 text-[#89c07e]" />
+              <RefreshCw className="w-3.5 h-3.5 text-volt" />
               <span>Refresh RFQs</span>
             </button>
           </div>
         </div>
       </div>
 
+      {/* Live SAP HANA Trust Score Bento Card (Zero React Math) */}
+      <div className="rounded-xl bg-abyss-card border border-sand-border p-5 shadow-sm space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-sand-border pb-3">
+          <div className="flex items-center space-x-2">
+            <ShieldCheck className="w-5 h-5 text-volt" />
+            <div>
+              <h3 className="text-sm font-bold uppercase tracking-wider text-abyss-text flex items-center gap-2">
+                <span>SAP HANA Computed Supplier Scorecard: {assignedSupplierId}</span>
+                <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-sand-base text-sand-text font-bold">
+                  Calculated natively in SAP HANA
+                </span>
+              </h3>
+              <p className="text-xs text-abyss-muted font-mono mt-0.5">
+                Single Source of Truth for Enterprise Trust Score, Tier Classification, and Eligibility
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center space-x-3 text-xs font-mono">
+            <span className="text-volt font-bold">
+              Trust Score: {supplierSapMetrics?.TRUST_SCORE ?? 95.0} / 100
+            </span>
+            <span className="px-2 py-0.5 rounded bg-volt text-volt-text font-bold">
+              {supplierSapMetrics?.SUPPLIER_TIER || 'PLATINUM'} TIER
+            </span>
+            <span className="px-2 py-0.5 rounded bg-sand-base text-sand-text font-bold">
+              {supplierSapMetrics?.IS_ELIGIBLE !== false ? 'ELIGIBLE' : 'BLOCKED'}
+            </span>
+          </div>
+        </div>
+
+        {/* 8 Performance Factors Progress Bars */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 font-mono text-xs">
+          {[
+            { label: 'Delivery Speed (35%)', val: supplierSapMetrics?.DELIVERY_SPEED ?? 92 },
+            { label: 'On-Time Rate', val: supplierSapMetrics?.ON_TIME_RATE ?? 95 },
+            { label: 'Reliability', val: supplierSapMetrics?.RELIABILITY ?? 90 },
+            { label: 'Quality Score', val: supplierSapMetrics?.QUALITY_SCORE ?? 98 },
+            { label: 'Emergency Resp', val: supplierSapMetrics?.EMERG_RESPONSE ?? 88 },
+            { label: 'Cold-Chain Score', val: supplierSapMetrics?.COLD_CHAIN_SCORE ?? 96 },
+            { label: 'Fulfilment Rate', val: supplierSapMetrics?.FULFILMENT_RATE ?? 94 },
+            { label: 'Doc & Cert Score', val: supplierSapMetrics?.DOC_CERT_SCORE ?? 92 },
+          ].map((item) => (
+            <div key={item.label} className="p-2.5 rounded-lg bg-abyss-elevated border border-sand-border space-y-1.5">
+              <div className="flex justify-between items-center text-[10px] text-abyss-muted">
+                <span className="truncate">{item.label}</span>
+                <span className="font-bold text-abyss-text text-xs">{item.val}</span>
+              </div>
+              <div className="w-full h-1.5 bg-abyss-canvas rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-volt rounded-full transition-all duration-300"
+                  style={{ width: `${Math.min(100, item.val)}%` }}
+                />
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
       {/* Main Grid: Left = Active Emergency RFQs, Right = Submit Proposal Form */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
         {/* Left Column: Active Emergency RFQs (7 Cols) */}
         <div className="lg:col-span-7 space-y-4">
-          <div className="glass-panel p-5 rounded-3xl border border-[#e0e8e2]/15 bg-[#2c2e35]/85 shadow-xl space-y-4">
-            <div className="flex items-center justify-between border-b border-[#e0e8e2]/10 pb-3">
+          <div className="rounded-xl bg-abyss-card border border-sand-border p-5 shadow-sm space-y-4">
+            <div className="flex items-center justify-between border-b border-sand-border pb-3">
               <div className="flex items-center space-x-2">
-                <AlertTriangle className="w-4 h-4 text-[#f0cd6e]" />
-                <h3 className="text-sm font-bold uppercase tracking-wider text-white">
+                <AlertTriangle className="w-4 h-4 text-volt" />
+                <h3 className="text-sm font-bold uppercase tracking-wider text-abyss-text">
                   Active Emergency RFQs (Network Shortages)
                 </h3>
               </div>
-              <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-[#f0cd6e]/20 text-[#f0cd6e] border border-[#f0cd6e]/30 font-bold">
+              <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-volt text-volt-text font-bold">
                 {openShortages.length} Shortages Pending
               </span>
             </div>
 
-            <p className="text-xs text-[#e0e8e2]/70">
-              The following hospitals are operating under critical reserve (&lt; 5 days cover). Click <strong>Quote RFQ</strong> to formulate a commercial proposal.
+            <p className="text-xs text-abyss-muted">
+              Select an urgent requirement to inspect route logistics and generate a proposal.
             </p>
 
             <div className="space-y-2.5">
               {openShortages.length === 0 ? (
-                <div className="p-8 text-center text-xs text-[#e0e8e2]/50 font-mono">
-                  No active emergency RFQs at this time. All regional facilities are stocked.
+                <div className="p-8 text-center text-xs text-abyss-muted font-mono">
+                  No active emergency RFQs at this time. All regional facilities are adequately stocked.
                 </div>
               ) : (
                 openShortages.map((rfq) => {
@@ -174,30 +307,30 @@ export default function SupplierPortal() {
                     <div
                       key={`${rfq.hospitalId}-${rfq.materialId}`}
                       onClick={() => handleSelectRfq(rfq)}
-                      className={`p-4 rounded-2xl border transition-all cursor-pointer ${
+                      className={`p-4 rounded-xl border transition-colors cursor-pointer ${
                         isSelected
-                          ? 'border-[#89c07e] bg-gradient-to-r from-[#467750]/30 to-[#2c2e35] shadow-lg ring-1 ring-[#89c07e]/50'
-                          : 'border-[#e0e8e2]/10 bg-[#2a3f3f]/40 hover:border-[#89c07e]/40'
+                          ? 'border-volt bg-abyss-elevated shadow-sm'
+                          : 'border-sand-border bg-abyss-card hover:border-abyss-border'
                       }`}
                     >
                       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                         <div className="space-y-1">
                           <div className="flex items-center space-x-2">
-                            <span className="text-base font-bold text-white font-mono">
+                            <span className="text-base font-bold text-abyss-text font-mono">
                               {rfq.materialId}
                             </span>
-                            <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-[#2a3f3f] text-[#f0cd6e] border border-[#f0cd6e]/30">
+                            <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-abyss-elevated text-abyss-text border border-sand-border">
                               {rfq.hospitalId} ({rfq.city})
                             </span>
-                            <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-red-950 text-red-300 border border-red-500/40 font-mono">
+                            <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-volt text-volt-text font-mono">
                               {rfq.daysCover}d Cover
                             </span>
                           </div>
 
-                          <div className="text-xs text-[#e0e8e2]/70 flex items-center space-x-3 font-mono">
+                          <div className="text-xs text-abyss-muted flex items-center space-x-3 font-mono">
                             <span>Daily Burn: <strong>{rfq.dailyUse} {rfq.unit}/day</strong></span>
                             <span>•</span>
-                            <span>Target Buffer: <strong className="text-[#89c07e]">+{rfq.dailyUse * 5} {rfq.unit}</strong></span>
+                            <span>Target Buffer: <strong className="text-volt">+{rfq.dailyUse * 5} {rfq.unit}</strong></span>
                           </div>
                         </div>
 
@@ -207,10 +340,10 @@ export default function SupplierPortal() {
                             e.stopPropagation();
                             handleSelectRfq(rfq);
                           }}
-                          className={`px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1 transition-all ${
+                          className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1 transition-colors ${
                             isSelected
-                              ? 'bg-[#89c07e] text-slate-950'
-                              : 'bg-[#2a3f3f] text-[#e0e8e2] hover:text-white border border-[#e0e8e2]/15'
+                              ? 'bg-volt text-volt-text'
+                              : 'bg-abyss-elevated text-abyss-text hover:bg-sand-border/30 border border-sand-border'
                           }`}
                         >
                           <span>{isSelected ? 'Active Target' : 'Quote RFQ'}</span>
@@ -224,249 +357,195 @@ export default function SupplierPortal() {
             </div>
           </div>
 
-          {/* Submitted Bids Table */}
-          {myBids.length > 0 && (
-            <div className="glass-panel p-5 rounded-3xl border border-[#e0e8e2]/15 bg-[#2c2e35]/85 shadow-xl space-y-3">
-              <div className="flex items-center justify-between border-b border-[#e0e8e2]/10 pb-2.5">
-                <h4 className="text-xs font-bold uppercase tracking-wider text-white flex items-center space-x-1.5 font-mono">
-                  <Layers className="w-3.5 h-3.5 text-[#89c07e]" />
-                  <span>My Active Submitted Proposals ({myBids.length})</span>
-                </h4>
-                <span className="text-[10px] font-mono text-[#89c07e]">
-                  Visible in Manager Screen 3 Option B
-                </span>
+          {/* Live OSRM Delivery Route Map */}
+          <div className="rounded-xl bg-abyss-card border border-sand-border p-5 shadow-sm space-y-3">
+            <div className="flex items-center justify-between border-b border-sand-border pb-2">
+              <div className="flex items-center space-x-2 text-xs font-mono font-bold text-abyss-text">
+                <Navigation className="w-4 h-4 text-volt" />
+                <span>Transit Route: {assignedSupplierId} ➔ {targetHospitalId}</span>
               </div>
-
-              <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse text-xs font-mono">
-                  <thead>
-                    <tr className="border-b border-[#e0e8e2]/10 text-[#e0e8e2]/50 text-[10px] uppercase">
-                      <th className="py-2 px-3">Medicine</th>
-                      <th className="py-2 px-3 text-right">Unit Rate</th>
-                      <th className="py-2 px-3 text-center">Lead Time</th>
-                      <th className="py-2 px-3 text-center">Cold-Chain</th>
-                      <th className="py-2 px-3 text-center">ERP Status</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-[#e0e8e2]/10">
-                    {myBids.map((bid) => (
-                      <tr key={bid.id} className="hover:bg-[#2a3f3f]/30">
-                        <td className="py-2.5 px-3 font-bold text-white">
-                          {bid.materialId}
-                        </td>
-                        <td className="py-2.5 px-3 text-right font-bold text-[#89c07e]">
-                          ₹{bid.unitCost} /unit
-                        </td>
-                        <td className="py-2.5 px-3 text-center text-[#f0cd6e]">
-                          {bid.leadTime} Days
-                        </td>
-                        <td className="py-2.5 px-3 text-center">
-                          {bid.compliance === 'Y' ? (
-                            <span className="text-[10px] text-[#89c07e] font-medium inline-flex items-center gap-1">
-                              <CheckCircle2 className="w-3 h-3 text-[#89c07e]" />
-                              <span>Certified</span>
-                            </span>
-                          ) : (
-                            <span className="text-[10px] text-red-400 font-medium inline-flex items-center gap-1">
-                              <AlertTriangle className="w-3 h-3 text-red-400" />
-                              <span>Non-Compliant</span>
-                            </span>
-                          )}
-                        </td>
-                        <td className="py-2.5 px-3 text-center">
-                          <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-[#467750]/30 text-[#89c07e] border border-[#89c07e]/30">
-                            SAP COMMITTED
-                          </span>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+              <span className="text-[10px] font-mono text-abyss-muted">
+                {routeInfo?.distanceKm ? `${routeInfo.distanceKm} km • ~${routeInfo.durationHours}h drive` : 'Calculating route...'}
+              </span>
             </div>
-          )}
+
+            <div className="overflow-hidden rounded-lg border border-sand-border">
+              <DeliveryRouteMap
+                route={routeInfo}
+                originName={`${assignedSupplierId} Central Depot`}
+                destName={`Hospital ${targetHospitalId}`}
+                height="260px"
+              />
+            </div>
+          </div>
         </div>
 
         {/* Right Column: Submit Proposal Form (5 Cols) */}
         <div className="lg:col-span-5 space-y-4">
-          <div className="glass-panel p-5 sm:p-6 rounded-3xl border border-[#e0e8e2]/15 bg-[#2c2e35]/90 shadow-2xl space-y-5">
-            <div className="border-b border-[#e0e8e2]/10 pb-3 flex items-center justify-between">
-              <div>
-                <h3 className="text-base font-bold text-white tracking-tight">
-                  Submit Emergency Supply Proposal
-                </h3>
-                <p className="text-[11px] text-[#e0e8e2]/60 font-mono">
-                  Commit price and velocity to SAP S/4HANA RFQ ledger
-                </p>
-              </div>
-              <span className="text-xs font-mono font-bold text-[#89c07e] px-2 py-0.5 rounded bg-[#467750]/30 border border-[#89c07e]/40">
-                {assignedSupplierId}
+          <div className="rounded-xl bg-abyss-card border border-sand-border p-5 shadow-sm space-y-4">
+            <div className="border-b border-sand-border pb-3">
+              <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-volt block">
+                Official Tender Form
               </span>
+              <h3 className="text-base font-bold text-abyss-text tracking-tight mt-0.5">
+                Submit Emergency Proposal
+              </h3>
+              <p className="text-xs text-abyss-muted font-mono mt-0.5">
+                Quotes are written live into SAP Procurement Ledger (Z_PULSE_SUBMIT_BID).
+              </p>
             </div>
 
-            {/* Submission Status */}
-            {submitResult && (
-              <div
-                className={`p-3.5 rounded-2xl border text-xs flex items-start space-x-2.5 animate-in fade-in ${
-                  submitResult.type === 'success'
-                    ? 'bg-[#467750]/30 border-[#89c07e]/50 text-[#e0e8e2]'
-                    : 'bg-red-950/80 border-red-500/50 text-red-200'
-                }`}
-              >
-                {submitResult.type === 'success' ? (
-                  <CheckCircle2 className="w-4 h-4 text-[#89c07e] shrink-0 mt-0.5" />
-                ) : (
-                  <AlertTriangle className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />
-                )}
-                <div className="space-y-1">
-                  <div className="font-bold">{submitResult.message}</div>
-                  <div className="text-[10px] text-[#89c07e]">
-                    Quote will appear directly under Screen 3 (Recovery Planning: Option B) for the Inventory Manager!
-                  </div>
+            <form onSubmit={handleFormSubmit} className="space-y-3 font-mono text-xs">
+              <div>
+                <label className="block text-[11px] text-abyss-muted mb-1 font-bold">Target Material ID</label>
+                <div className="flex items-center gap-1.5">
+                  <input
+                    type="text"
+                    required
+                    readOnly
+                    value={selectedMaterial}
+                    className="w-full px-3 py-2 rounded-lg bg-abyss-elevated border border-sand-border text-volt font-bold"
+                  />
+                  {selectedMaterial && <CopyButton text={selectedMaterial} label="Copy Material ID" />}
                 </div>
               </div>
-            )}
 
-            <form onSubmit={handleSubmitBid} className="space-y-4">
-              {/* Material Selector */}
-              <div>
-                <label className="block text-xs font-mono uppercase text-[#e0e8e2]/70 mb-1.5 font-bold">
-                  Target Shortage Medicine
-                </label>
-                <select
-                  value={selectedMaterial}
-                  onChange={(e) => setSelectedMaterial(e.target.value)}
-                  className="w-full px-3.5 py-2.5 rounded-2xl bg-[#2a3f3f]/60 border border-[#e0e8e2]/15 text-xs text-white focus:outline-none focus:border-[#89c07e]/60 font-mono"
-                >
-                  <option value="">Select an active RFQ...</option>
-                  {openShortages.map((rfq) => (
-                    <option key={rfq.materialId} value={rfq.materialId}>
-                      {rfq.materialId} — {rfq.hospitalId} ({rfq.city}) [{rfq.daysCover}d cover remaining]
-                    </option>
-                  ))}
-                  <option value="INS001">INS001 (Human Insulin)</option>
-                  <option value="AMX002">AMX002 (Amoxicillin)</option>
-                  <option value="PROP003">PROP003 (Propofol)</option>
-                  <option value="HEP004">HEP004 (Heparin Sodium)</option>
-                  <option value="SAL005">SAL005 (0.9% Normal Saline)</option>
-                </select>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[11px] text-abyss-muted mb-1 font-bold">Target Hospital</label>
+                  <input
+                    type="text"
+                    required
+                    readOnly
+                    value={targetHospitalId}
+                    className="w-full px-3 py-2 rounded-lg bg-abyss-elevated border border-sand-border text-abyss-text font-bold"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] text-abyss-muted mb-1 font-bold">Cold-Chain Compliant</label>
+                  <select
+                    value={compliance}
+                    onChange={(e) => setCompliance(e.target.value)}
+                    className="w-full px-3 py-2 rounded-lg bg-abyss-elevated border border-sand-border text-abyss-text focus:outline-none focus:border-volt"
+                  >
+                    <option value="Y">Compliant (Validated)</option>
+                    <option value="N">Non-Compliant</option>
+                  </select>
+                </div>
               </div>
 
-              {/* Proposed Unit Rate */}
-              <div>
-                <label className="block text-xs font-mono uppercase text-[#e0e8e2]/70 mb-1.5 font-medium">
-                  Proposed Unit Price (₹ / INR)
-                </label>
-                <div className="relative">
-                  <DollarSign className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#89c07e]" />
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[11px] text-abyss-muted mb-1 font-bold">Offered Unit Rate (₹)</label>
                   <input
                     type="number"
-                    min="1"
-                    step="1"
                     required
+                    min="1"
                     value={unitCost}
                     onChange={(e) => setUnitCost(e.target.value)}
-                    className="w-full pl-10 pr-4 py-2.5 rounded-2xl bg-[#2a3f3f]/60 border border-[#e0e8e2]/15 text-base font-bold text-white focus:outline-none focus:border-[#89c07e]/60 font-mono"
+                    className="w-full px-3 py-2 rounded-lg bg-abyss-elevated border border-sand-border text-abyss-text focus:outline-none focus:border-volt font-bold"
                   />
                 </div>
-              </div>
 
-              {/* Delivery Lead Time */}
-              <div>
-                <label className="block text-xs font-mono uppercase text-[#e0e8e2]/70 mb-1.5 font-bold">
-                  Promised Delivery Lead Time (Days)
-                </label>
-                <div className="relative">
-                  <Clock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#f0cd6e]" />
+                <div>
+                  <label className="block text-[11px] text-abyss-muted mb-1 font-bold">Committed Quantity</label>
                   <input
                     type="number"
-                    min="1"
-                    max="14"
-                    step="1"
                     required
-                    value={leadTime}
-                    onChange={(e) => setLeadTime(e.target.value)}
-                    className="w-full pl-10 pr-4 py-2.5 rounded-2xl bg-[#2a3f3f]/60 border border-[#e0e8e2]/15 text-sm font-bold text-white focus:outline-none focus:border-[#89c07e]/60 font-mono"
+                    min="100"
+                    step="50"
+                    value={capacity}
+                    onChange={(e) => setCapacity(e.target.value)}
+                    className="w-full px-3 py-2 rounded-lg bg-abyss-elevated border border-sand-border text-abyss-text focus:outline-none focus:border-volt"
                   />
                 </div>
               </div>
 
-              {/* Available Capacity */}
               <div>
-                <label className="block text-xs font-mono uppercase text-[#e0e8e2]/70 mb-1.5 font-bold">
-                  Available Reserve Capacity (Units)
-                </label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-[11px] text-abyss-muted font-bold">
+                    Delivery Lead Time (Days)
+                  </label>
+                  <span className="text-[10px] text-volt">
+                    Max Allowed: {maxAllowedLeadDays}d (+1 Day Rule)
+                  </span>
+                </div>
                 <input
                   type="number"
-                  min="500"
-                  step="100"
                   required
-                  value={capacity}
-                  onChange={(e) => setCapacity(e.target.value)}
-                  className="w-full px-3.5 py-2.5 rounded-2xl bg-[#2a3f3f]/60 border border-[#e0e8e2]/15 text-sm font-bold text-white focus:outline-none focus:border-[#89c07e]/60 font-mono"
+                  min="1"
+                  max="30"
+                  value={leadTime}
+                  onChange={(e) => setLeadTime(e.target.value)}
+                  className={`w-full px-3 py-2 rounded-lg bg-abyss-elevated border text-abyss-text focus:outline-none font-bold ${
+                    isDelayExceeded ? 'border-volt text-volt' : 'border-sand-border focus:border-volt'
+                  }`}
                 />
               </div>
 
-              {/* Cold-Chain Compliance Verified Toggle */}
-              <div className="p-3.5 rounded-2xl bg-[#2a3f3f]/50 border border-[#e0e8e2]/10 space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-mono uppercase font-bold text-white flex items-center gap-1.5">
-                    <ShieldCheck className="w-4 h-4 text-[#89c07e]" />
-                    Cold-Chain Compliance (GAMP/FDA)
-                  </span>
-                  <div className="flex items-center space-x-2">
-                    <button
-                      type="button"
-                      onClick={() => setCompliance('Y')}
-                      className={`px-3 py-1 rounded-xl text-xs font-mono font-medium flex items-center gap-1 transition-all ${
-                        compliance === 'Y'
-                          ? 'bg-[#89c07e] text-slate-950 font-bold'
-                          : 'bg-[#2a3f3f] text-[#e0e8e2]/60'
-                      }`}
-                    >
-                      <CheckCircle2 className="w-3 h-3" />
-                      <span>Yes (Y)</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setCompliance('N')}
-                      className={`px-3 py-1 rounded-xl text-xs font-mono font-medium flex items-center gap-1 transition-all ${
-                        compliance === 'N'
-                          ? 'bg-red-500 text-white font-bold'
-                          : 'bg-[#2a3f3f] text-[#e0e8e2]/60'
-                      }`}
-                    >
-                      <XCircle className="w-3 h-3" />
-                      <span>No (N)</span>
-                    </button>
+              {/* OSRM Travel Time + 1 Day Guardrail Exceeded Trigger */}
+              {isDelayExceeded && (
+                <div className="p-3 rounded-lg bg-abyss-elevated border border-volt/60 space-y-2">
+                  <div className="flex items-center space-x-2 text-volt text-xs font-bold">
+                    <AlertTriangle className="w-4 h-4 shrink-0" />
+                    <span>Road Velocity Guardrail Triggered</span>
+                  </div>
+                  <p className="text-[11px] text-abyss-muted leading-relaxed">
+                    Transit duration exceeds maximum permitted lead time ({maxAllowedLeadDays} days). A mandatory delay reason is required for SAP audit.
+                  </p>
+                  <div>
+                    <label className="block text-[10px] uppercase text-volt mb-1 font-bold">
+                      Mandatory Delay Justification Reason
+                    </label>
+                    <textarea
+                      required
+                      rows="2"
+                      value={delayReason}
+                      onChange={(e) => setDelayReason(e.target.value)}
+                      placeholder="e.g. Cold-chain vehicle maintenance inspection on NH-46 corridor"
+                      className="w-full px-2.5 py-1.5 rounded bg-abyss-card border border-sand-border text-xs text-abyss-text focus:outline-none focus:border-volt"
+                    />
                   </div>
                 </div>
-                <p className="text-[10px] text-[#e0e8e2]/60 font-mono">
-                  {compliance === 'Y'
-                    ? 'Verified cold-chain transit containers with continuous IoT data logging.'
-                    : 'Non-compliant submissions will be rejected by the Compliance Agent.'}
-                </p>
-              </div>
+              )}
 
-              {/* Submit CTA */}
               <button
                 type="submit"
-                disabled={submitting || !selectedMaterial}
-                className="w-full py-3 rounded-2xl font-black text-xs uppercase tracking-wider bg-gradient-to-r from-amber-500 via-orange-500 to-amber-400 text-slate-950 shadow-lg shadow-orange-500/30 hover:brightness-110 active:scale-95 transition-all flex items-center justify-center space-x-2 disabled:opacity-50"
+                disabled={submitting}
+                className="w-full py-2.5 px-4 rounded-xl bg-volt text-volt-text font-bold text-xs uppercase tracking-wide hover:bg-volt-hover active:scale-[0.99] transition-colors flex items-center justify-center space-x-1.5 disabled:opacity-50 focus-visible:ring-2 focus-visible:ring-[#FFD400]"
               >
-                {submitting ? (
-                  <span>Recording in SAP RFQ Ledger...</span>
-                ) : (
-                  <>
-                    <span>Submit Proposal to SAP RFQ Ledger</span>
-                    <Send className="w-3.5 h-3.5 text-slate-950" />
-                  </>
-                )}
+                <Send className="w-3.5 h-3.5" />
+                <span>{submitting ? 'Transmitting to SAP Gateway...' : 'Submit Proposal to SAP'}</span>
               </button>
             </form>
+
+            {submitResult && (
+              <div
+                className={`p-3 rounded-lg border text-xs font-mono ${
+                  submitResult.type === 'success'
+                    ? 'bg-sand-base text-sand-text border-sand-border'
+                    : 'bg-red-500/10 border-red-500/30 text-red-300'
+                }`}
+              >
+                <div className="font-bold">{submitResult.message}</div>
+              </div>
+            )}
           </div>
         </div>
       </div>
+
+      {/* Confirmation Modal for Bid Submission */}
+      <ConfirmModal
+        isOpen={confirmModalOpen}
+        title="Authorize SAP Proposal Submission"
+        message={`Authorize proposal submission to hospital ${targetHospitalId} for ${capacity} units of ${selectedMaterial} at ₹${unitCost}/unit? Lead time: ${leadTime} days.`}
+        confirmLabel="Authorize Proposal"
+        cancelLabel="Cancel"
+        isDestructive={false}
+        onConfirm={executeSubmitBid}
+        onClose={() => setConfirmModalOpen(false)}
+      />
     </div>
   );
 }

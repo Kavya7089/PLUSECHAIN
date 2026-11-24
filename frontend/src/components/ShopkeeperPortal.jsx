@@ -1,6 +1,8 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import axios from 'axios';
 import { usePulseChain } from '../context/PulseChainContext';
+import CopyButton from './common/CopyButton';
+import ConfirmModal from './common/ConfirmModal';
 import {
   Building2,
   Package,
@@ -10,34 +12,56 @@ import {
   Send,
   RefreshCw,
   Mail,
-  ShieldAlert,
   ClipboardList,
-  Sparkles,
-  ArrowRight,
-  TrendingDown,
+  Truck,
+  Inbox,
+  CheckCheck,
+  XCircle,
   Activity,
 } from 'lucide-react';
 
-const API_BASE_URL = 'http://localhost:5000/api';
+const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000') + '/api';
 
 export default function ShopkeeperPortal() {
   const { user, inventory, fetchInventory } = usePulseChain();
 
-  const assignedHospitalId = user?.hospitalId || 'H004';
+  const assignedHospitalId = user?.hospitalId || user?.hospital_id || 'H004';
   const assignedCity = user?.city || 'BHOPAL';
 
-  // Filter inventory strictly for assigned facility (H004)
+  // 3 Strict Tabs: 'RECEIPTS' (Tab 1), 'DISPATCH' (Tab 2), 'AUDIT' (Tab 3)
+  const [activeTab, setActiveTab] = useState('RECEIPTS');
+  const [lastUpdated, setLastUpdated] = useState(() => new Date().toLocaleTimeString());
+
+  // Filter inventory strictly for assigned facility
   const facilityInventory = useMemo(() => {
-    return inventory.filter((item) => item.HOSPITAL_ID === assignedHospitalId);
+    return (inventory || []).filter((item) => item.HOSPITAL_ID === assignedHospitalId);
   }, [inventory, assignedHospitalId]);
 
-  // Form state
+  // Form state for Physical Stock Count
   const [selectedMaterial, setSelectedMaterial] = useState('AMX002');
   const [stockQty, setStockQty] = useState(110);
   const [dailyUse, setDailyUse] = useState(45);
   const [submitting, setSubmitting] = useState(false);
   const [submitResult, setSubmitResult] = useState(null);
   const [recentAudits, setRecentAudits] = useState([]);
+
+  // Shipment Approvals State
+  const [outgoingDispatches, setOutgoingDispatches] = useState([]);
+  const [incomingReceipts, setIncomingReceipts] = useState([]);
+  const [loadingShipments, setLoadingShipments] = useState(false);
+  const [shipmentActionId, setShipmentActionId] = useState(null);
+  const [shipmentFeedback, setShipmentFeedback] = useState(null);
+  const [committedReceiptIds, setCommittedReceiptIds] = useState(new Set());
+
+  // Accessible ConfirmModal State
+  const [confirmDialog, setConfirmDialog] = useState({
+    isOpen: false,
+    title: '',
+    message: '',
+    confirmLabel: '',
+    isDestructive: false,
+    onConfirm: () => {},
+  });
 
   // Calculate live days of cover as user types
   const liveDaysCover = useMemo(() => {
@@ -48,6 +72,26 @@ export default function ShopkeeperPortal() {
   }, [stockQty, dailyUse]);
 
   const isCriticalDeficit = liveDaysCover < 5;
+
+  // Fetch pending shipments (2-Step Approvals)
+  const fetchPendingShipments = useCallback(async () => {
+    setLoadingShipments(true);
+    try {
+      const res = await axios.get(`${API_BASE_URL}/shipments/pending`);
+      if (res.data?.success) {
+        setOutgoingDispatches(res.data.outgoingDispatches || []);
+        setIncomingReceipts(res.data.incomingReceipts || []);
+      }
+    } catch (err) {
+      console.warn('[Shopkeeper] Pending shipments fetch note:', err.message);
+    } finally {
+      setLoadingShipments(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchPendingShipments();
+  }, [fetchPendingShipments]);
 
   // Handle selecting an item from the table
   const handleSelectItem = (item) => {
@@ -79,7 +123,6 @@ export default function ShopkeeperPortal() {
           sapRecorded: response.data.sapRecorded,
         });
 
-        // Add to audit list
         setRecentAudits((prev) => [
           {
             id: response.data.data.auditLogId || `CNT-${Date.now()}`,
@@ -94,6 +137,7 @@ export default function ShopkeeperPortal() {
         ]);
 
         await fetchInventory();
+        setLastUpdated(new Date().toLocaleTimeString());
       }
     } catch (err) {
       setSubmitResult({
@@ -105,353 +149,723 @@ export default function ShopkeeperPortal() {
     }
   };
 
+  // Step 1: Approve Outgoing Dispatch
+  const executeApproveDispatch = async (shipmentId) => {
+    setShipmentActionId(shipmentId);
+    setShipmentFeedback(null);
+    try {
+      const res = await axios.post(`${API_BASE_URL}/shipments/${shipmentId}/approve-dispatch`);
+      if (res.data?.success) {
+        setShipmentFeedback({
+          type: 'success',
+          message: res.data.message || 'Dispatch approved & stock deducted live in SAP S/4HANA!',
+        });
+        await fetchPendingShipments();
+        await fetchInventory();
+      }
+    } catch (err) {
+      setShipmentFeedback({
+        type: 'error',
+        message: err.response?.data?.error || err.response?.data?.message || 'Dispatch approval failed.',
+      });
+    } finally {
+      setShipmentActionId(null);
+    }
+  };
+
+  const handleApproveDispatch = (shipment) => {
+    setConfirmDialog({
+      isOpen: true,
+      title: 'Authorize Outgoing Dispatch (-SAP)',
+      message: `Confirm physical dispatch of order ${shipment.id} (${shipment.qty} units of ${shipment.material_id}) to ${shipment.dest_hospital_id}? This will immediately deduct inventory in SAP S/4HANA ZPULSE_INV.`,
+      confirmLabel: 'Approve & Deduct SAP Stock',
+      isDestructive: false,
+      onConfirm: () => executeApproveDispatch(shipment.id),
+    });
+  };
+
+  // Step 1 (Alternative): Reject Outgoing Dispatch
+  const executeRejectDispatch = async (shipmentId) => {
+    setShipmentActionId(shipmentId);
+    setShipmentFeedback(null);
+    try {
+      const res = await axios.post(`${API_BASE_URL}/shipments/${shipmentId}/reject`, {
+        rejection_note: 'Physical inspection failed or inventory discrepancy reported by shopkeeper.',
+      });
+      if (res.data?.success) {
+        setShipmentFeedback({
+          type: 'info',
+          message: 'Dispatch shipment rejected before stock deduction.',
+        });
+        await fetchPendingShipments();
+      }
+    } catch (err) {
+      setShipmentFeedback({
+        type: 'error',
+        message: err.response?.data?.error || 'Rejection failed.',
+      });
+    } finally {
+      setShipmentActionId(null);
+    }
+  };
+
+  const handleRejectDispatch = (shipment) => {
+    setConfirmDialog({
+      isOpen: true,
+      title: 'Reject Outgoing Dispatch',
+      message: `Are you sure you want to reject shipment ${shipment.id}? This will cancel the goods movement order before any SAP stock deduction occurs.`,
+      confirmLabel: 'Reject Shipment',
+      isDestructive: true,
+      onConfirm: () => executeRejectDispatch(shipment.id),
+    });
+  };
+
+  // Step 2: Approve Incoming Goods Receipt
+  const executeApproveReceipt = async (shipmentId) => {
+    setShipmentActionId(shipmentId);
+    setShipmentFeedback(null);
+    try {
+      const res = await axios.post(`${API_BASE_URL}/shipments/${shipmentId}/approve-receipt`);
+      if (res.data?.success) {
+        setCommittedReceiptIds((prev) => new Set([...prev, shipmentId]));
+        setShipmentFeedback({
+          type: 'success',
+          message: res.data.message || 'Goods received and added live into SAP ERP inventory!',
+        });
+        await fetchPendingShipments();
+        await fetchInventory();
+      }
+    } catch (err) {
+      setShipmentFeedback({
+        type: 'error',
+        message: err.response?.data?.error || err.response?.data?.message || 'Receipt approval failed.',
+      });
+    } finally {
+      setShipmentActionId(null);
+    }
+  };
+
+  const handleApproveReceipt = (shipment) => {
+    setConfirmDialog({
+      isOpen: true,
+      title: 'Confirm Goods Receipt (+SAP)',
+      message: `Confirm physical receipt and cold-chain inspection of shipment ${shipment.id} (${shipment.qty} units of ${shipment.material_id})? This will immediately add inventory to ${assignedHospitalId} in SAP S/4HANA ZPULSE_INV.`,
+      confirmLabel: 'Approve & Add SAP Stock',
+      isDestructive: false,
+      onConfirm: () => executeApproveReceipt(shipment.id),
+    });
+  };
+
   return (
-    <div className="space-y-6 max-w-7xl mx-auto animate-in fade-in duration-300">
-      {/* Top Banner: Facility Identity */}
-      <div className="glass-panel p-5 rounded-3xl border border-[#e0e8e2]/15 bg-gradient-to-r from-[#2c2e35]/95 via-[#2a3f3f]/85 to-[#2c2e35]/95 shadow-xl">
+    <div className="space-y-5 max-w-7xl mx-auto text-abyss-text font-sans">
+      {/* Top Bento Header: Facility Identity & 3-Tab Navigation */}
+      <div className="rounded-xl bg-abyss-card border border-sand-border p-5 shadow-sm">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="flex items-center space-x-3.5">
-            <div className="p-3 rounded-2xl bg-[#f0cd6e]/20 border border-[#f0cd6e]/40 text-[#f0cd6e]">
+            <div className="p-3 rounded-xl bg-abyss-elevated border border-sand-border text-volt">
               <Building2 className="w-6 h-6" />
             </div>
             <div>
               <div className="flex items-center space-x-2">
-                <h2 className="text-xl sm:text-2xl font-black text-white tracking-tight">
-                  Hospital Stock Audit Portal
+                <h2 className="text-xl sm:text-2xl font-black text-abyss-text tracking-tight">
+                  Hospital Shopkeeper & Goods Control
                 </h2>
-                <span className="text-[10px] font-mono font-bold px-2.5 py-0.5 rounded-full bg-[#f0cd6e] text-[#2c2e35]">
-                  SAP MM-IM AUDIT
+                <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-volt text-volt-text">
+                  SAP S/4HANA GATEWAY
                 </span>
               </div>
-              <p className="text-xs text-[#e0e8e2]/70 font-mono mt-0.5">
-                Assigned Facility: <strong className="text-white">{assignedHospitalId} (Bhopal Apex Care)</strong> • City:{' '}
-                <strong className="text-[#f0cd6e]">{assignedCity}</strong> • Auditor:{' '}
-                <strong className="text-[#89c07e]">{user?.name}</strong>
+              <p className="text-xs text-abyss-muted font-mono mt-0.5">
+                Facility: <strong className="text-abyss-text">{assignedHospitalId}</strong> • City:{' '}
+                <strong className="text-volt">{assignedCity}</strong> • Auditor:{' '}
+                <strong className="text-abyss-text">{user?.name}</strong> • Bay:{' '}
+                <strong className="text-abyss-text">{user?.warehouseBay || 'COLD_CHAIN_BAY_1'}</strong>
               </p>
             </div>
           </div>
 
-          <div className="flex items-center space-x-3 self-start md:self-center">
+          {/* Exact 3 Tabs Ordered per Specification */}
+          <div className="flex items-center flex-wrap gap-2 self-start md:self-center">
+            {/* Tab 1: Incoming Goods Receipt (+SAP Stock) */}
             <button
-              onClick={fetchInventory}
-              className="flex items-center space-x-1.5 px-3 py-2 rounded-xl text-xs font-mono bg-[#2a3f3f]/60 border border-[#e0e8e2]/15 text-[#e0e8e2] hover:border-[#89c07e]/50 transition-all"
+              type="button"
+              onClick={() => setActiveTab('RECEIPTS')}
+              className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-mono font-bold transition-colors focus-visible:ring-2 focus-visible:ring-[#FFD400] ${
+                activeTab === 'RECEIPTS'
+                  ? 'bg-volt text-volt-text shadow-sm'
+                  : 'bg-abyss-elevated text-abyss-muted hover:text-abyss-text border border-sand-border'
+              }`}
             >
-              <RefreshCw className="w-3.5 h-3.5 text-[#89c07e]" />
-              <span>Refresh Ledger</span>
+              <Inbox className="w-4 h-4" />
+              <span>Incoming Goods Receipt (+SAP)</span>
+              {incomingReceipts.length > 0 && (
+                <span className="ml-1 px-1.5 py-0.2 rounded text-[10px] font-black bg-[#081F20] text-volt">
+                  {incomingReceipts.length}
+                </span>
+              )}
+            </button>
+
+            {/* Tab 2: Outgoing Dispatch Approvals (-SAP Stock) */}
+            <button
+              type="button"
+              onClick={() => setActiveTab('DISPATCH')}
+              className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-mono font-bold transition-colors focus-visible:ring-2 focus-visible:ring-[#FFD400] ${
+                activeTab === 'DISPATCH'
+                  ? 'bg-volt text-volt-text shadow-sm'
+                  : 'bg-abyss-elevated text-abyss-muted hover:text-abyss-text border border-sand-border'
+              }`}
+            >
+              <Truck className="w-4 h-4" />
+              <span>Outgoing Dispatches (-SAP)</span>
+              {outgoingDispatches.length > 0 && (
+                <span className="ml-1 px-1.5 py-0.2 rounded text-[10px] font-black bg-[#081F20] text-volt">
+                  {outgoingDispatches.length}
+                </span>
+              )}
+            </button>
+
+            {/* Tab 3: Physical Stock Count Ledger */}
+            <button
+              type="button"
+              onClick={() => setActiveTab('AUDIT')}
+              className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-mono font-bold transition-colors focus-visible:ring-2 focus-visible:ring-[#FFD400] ${
+                activeTab === 'AUDIT'
+                  ? 'bg-volt text-volt-text shadow-sm'
+                  : 'bg-abyss-elevated text-abyss-muted hover:text-abyss-text border border-sand-border'
+              }`}
+            >
+              <ClipboardList className="w-4 h-4" />
+              <span>Stock Count Ledger</span>
+            </button>
+
+            {/* Refresh Button */}
+            <button
+              type="button"
+              onClick={() => {
+                fetchInventory();
+                fetchPendingShipments();
+                setLastUpdated(new Date().toLocaleTimeString());
+              }}
+              className="p-2 rounded-lg text-xs font-mono bg-abyss-elevated border border-sand-border text-abyss-text hover:border-volt transition-colors"
+              title="Refresh All Data"
+            >
+              <RefreshCw className={`w-4 h-4 text-volt ${loadingShipments ? 'animate-spin' : ''}`} />
             </button>
           </div>
         </div>
       </div>
 
-      {/* Main Grid: Left = Facility Inventory List, Right = Physical Count Form */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {/* Left Column: H004 Inventory Ledger (7 Cols) */}
-        <div className="lg:col-span-7 space-y-4">
-          <div className="glass-panel p-5 rounded-3xl border border-[#e0e8e2]/15 bg-[#2c2e35]/85 shadow-xl space-y-4">
-            <div className="flex items-center justify-between border-b border-[#e0e8e2]/10 pb-3">
-              <div className="flex items-center space-x-2">
-                <ClipboardList className="w-4 h-4 text-[#89c07e]" />
-                <h3 className="text-sm font-bold uppercase tracking-wider text-white">
-                  Hospital H004 Live Stock Ledger
+      {/* Dynamic Feedback Toast for Shipment Actions */}
+      {shipmentFeedback && (
+        <div className="p-3.5 rounded-xl border border-sand-border bg-abyss-card flex items-center justify-between text-xs font-mono shadow-sm">
+          <div className="flex items-center space-x-2">
+            <CheckCircle2 className="w-4 h-4 text-volt shrink-0" />
+            <span className="text-abyss-text">{shipmentFeedback.message}</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setShipmentFeedback(null)}
+            className="text-[10px] uppercase font-bold text-abyss-muted hover:text-abyss-text"
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* TAB 1: INCOMING GOODS RECEIPT (+SAP STOCK COMMITTED)                       */}
+      {/* ========================================================================= */}
+      {activeTab === 'RECEIPTS' && (
+        <div className="rounded-xl bg-abyss-card border border-sand-border p-5 shadow-sm space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-sand-border pb-3 gap-2">
+            <div className="flex items-center space-x-2">
+              <Inbox className="w-5 h-5 text-volt" />
+              <div>
+                <h3 className="text-sm font-bold uppercase tracking-wider text-abyss-text">
+                  Tab 1: Incoming Goods Receipt (+SAP Stock)
                 </h3>
+                <p className="text-[11px] text-abyss-muted font-mono">
+                  Shipments destined for {assignedHospitalId}. Authorizing receipt adds stock live into SAP ZPULSE_INV.
+                </p>
               </div>
-              <span className="text-[10px] font-mono text-[#e0e8e2]/60">
-                Click a row to audit
-              </span>
             </div>
-
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse text-xs font-mono">
-                <thead>
-                  <tr className="border-b border-[#e0e8e2]/10 text-[#e0e8e2]/50 text-[10px] uppercase">
-                    <th className="py-2.5 px-3">Medicine ID</th>
-                    <th className="py-2.5 px-3 text-right">Physical Stock</th>
-                    <th className="py-2.5 px-3 text-right">Daily Burn</th>
-                    <th className="py-2.5 px-3 text-center">Days Cover</th>
-                    <th className="py-2.5 px-3 text-center">Audit Status</th>
-                    <th className="py-2.5 px-3 text-right">Action</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-[#e0e8e2]/10">
-                  {facilityInventory.map((item) => {
-                    const isDeficit = item.daysCover < 5;
-                    const isSelected = item.MATERIAL_ID === selectedMaterial;
-
-                    return (
-                      <tr
-                        key={item.MATERIAL_ID}
-                        onClick={() => handleSelectItem(item)}
-                        className={`cursor-pointer transition-all ${
-                          isSelected
-                            ? 'bg-[#2a3f3f]/90 border-l-2 border-[#f0cd6e]'
-                            : 'hover:bg-[#2a3f3f]/40'
-                        } ${isDeficit ? 'bg-red-950/20' : ''}`}
-                      >
-                        <td className="py-3 px-3">
-                          <div className="font-bold text-white flex items-center space-x-1.5 font-sans">
-                            <Package className="w-3.5 h-3.5 text-[#89c07e]" />
-                            <span>{item.MATERIAL_ID}</span>
-                          </div>
-                          <span className="text-[10px] text-[#e0e8e2]/50 font-mono">
-                            {item.UNIT}
-                          </span>
-                        </td>
-
-                        <td className="py-3 px-3 text-right font-black text-sm text-white">
-                          {item.STOCK_QTY.toLocaleString()}
-                        </td>
-
-                        <td className="py-3 px-3 text-right text-[#e0e8e2]/70">
-                          {item.DAILY_USE} /day
-                        </td>
-
-                        <td className="py-3 px-3 text-center">
-                          <span
-                            className={`px-2 py-0.5 rounded text-[11px] font-black ${
-                              isDeficit
-                                ? 'bg-red-950/80 text-red-300 border border-red-500/50'
-                                : 'bg-[#467750]/30 text-[#89c07e] border border-[#89c07e]/30'
-                            }`}
-                          >
-                            {item.daysCover} Days
-                          </span>
-                        </td>
-
-                        <td className="py-3 px-3 text-center">
-                          {isDeficit ? (
-                            <span className="inline-flex items-center space-x-1 text-[10px] text-red-400 font-bold">
-                              <AlertTriangle className="w-3 h-3 text-red-400" />
-                              <span>Shortage</span>
-                            </span>
-                          ) : (
-                            <span className="inline-flex items-center space-x-1 text-[10px] text-[#89c07e] font-bold">
-                              <CheckCircle2 className="w-3 h-3 text-[#89c07e]" />
-                              <span>Adequate</span>
-                            </span>
-                          )}
-                        </td>
-
-                        <td className="py-3 px-3 text-right">
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleSelectItem(item);
-                            }}
-                            className={`px-2.5 py-1 rounded-lg text-[10px] font-bold font-sans transition-all ${
-                              isSelected
-                                ? 'bg-[#f0cd6e] text-slate-950 font-black'
-                                : 'bg-[#2a3f3f] text-[#e0e8e2] hover:text-white'
-                            }`}
-                          >
-                            {isSelected ? 'Editing' : 'Count'}
-                          </button>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
+            <span className="px-2 py-0.5 rounded text-xs font-mono font-bold bg-volt text-volt-text self-start sm:self-auto">
+              {incomingReceipts.length} Inbound Shipments Pending
+            </span>
           </div>
 
-          {/* Audit History Log */}
-          {recentAudits.length > 0 && (
-            <div className="glass-panel p-4 rounded-3xl border border-[#e0e8e2]/15 bg-[#2c2e35]/70 space-y-3">
-              <h4 className="text-xs font-bold uppercase tracking-wider text-[#e0e8e2]/80 flex items-center space-x-1.5 font-mono">
-                <Clock className="w-3.5 h-3.5 text-[#f0cd6e]" />
-                <span>Recent Count Submissions for Hospital H004</span>
-              </h4>
-              <div className="space-y-1.5">
-                {recentAudits.slice(0, 3).map((audit) => (
+          {incomingReceipts.length === 0 ? (
+            <div className="py-12 text-center text-xs font-mono text-abyss-muted border border-dashed border-sand-border rounded-xl space-y-2">
+              <div className="w-10 h-10 mx-auto rounded-full bg-abyss-elevated flex items-center justify-center text-volt">
+                <CheckCheck className="w-5 h-5" />
+              </div>
+              <div className="font-bold text-abyss-text">No incoming shipments currently awaiting receipt for facility {assignedHospitalId}.</div>
+              <p className="text-[10px] text-abyss-muted">
+                Supplier deliveries and peer hospital transfers will appear here once dispatched.
+              </p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {incomingReceipts.map((shipment) => {
+                const isCommitted = committedReceiptIds.has(shipment.id);
+                return (
                   <div
-                    key={audit.id}
-                    className="p-2.5 rounded-xl bg-[#2a3f3f]/50 border border-[#e0e8e2]/10 flex items-center justify-between text-xs font-mono"
+                    key={shipment.id}
+                    className="p-4 rounded-xl bg-abyss-elevated border border-sand-border space-y-3 font-mono text-xs"
                   >
-                    <div>
-                      <span className="font-bold text-white">{audit.materialId}</span> • Stock:{' '}
-                      <span className="text-[#89c07e]">{audit.stockQty}</span> • Daily:{' '}
-                      <span className="text-[#e0e8e2]/70">{audit.dailyUse}</span>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <span
-                        className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                          audit.daysCover < 5
-                            ? 'bg-red-950 text-red-300 border border-red-500/40'
-                            : 'bg-[#467750]/30 text-[#89c07e]'
-                        }`}
-                      >
-                        {audit.daysCover}d Cover
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-1.5 font-bold text-abyss-text">
+                        <span>{shipment.id}</span>
+                        <CopyButton text={shipment.id} label="Copy Shipment ID" />
+                      </div>
+                      <span className="px-2 py-0.5 rounded text-[10px] bg-sand-base text-sand-text font-bold">
+                        {shipment.status}
                       </span>
-                      {audit.alertTriggered && (
-                        <span className="text-[10px] text-[#f0cd6e] flex items-center gap-1 font-bold">
-                          <Mail className="w-3 h-3 text-[#f0cd6e]" /> Dual Emails Dispatched
-                        </span>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2 text-[11px]">
+                      <div>
+                        <span className="text-abyss-muted block text-[9px] uppercase">Material</span>
+                        <div className="flex items-center gap-1">
+                          <strong className="text-volt">{shipment.material_id}</strong>
+                          <CopyButton text={shipment.material_id} label="Copy Material ID" />
+                        </div>
+                      </div>
+                      <div>
+                        <span className="text-abyss-muted block text-[9px] uppercase">Quantity</span>
+                        <strong className="text-abyss-text">{shipment.qty} Units</strong>
+                      </div>
+                      <div>
+                        <span className="text-abyss-muted block text-[9px] uppercase">Origin</span>
+                        <strong className="text-abyss-text">{shipment.source_facility || shipment.source_hospital_id || 'SUPPLIER'}</strong>
+                      </div>
+                      <div>
+                        <span className="text-abyss-muted block text-[9px] uppercase">Order Type</span>
+                        <strong className="text-abyss-text">{shipment.order_type}</strong>
+                      </div>
+                    </div>
+
+                    <div className="pt-2 border-t border-sand-border">
+                      {isCommitted ? (
+                        <div className="py-2 px-3 rounded-lg bg-sand-base text-sand-text font-bold text-xs text-center">
+                          SAP ZPULSE_INV +QTY COMMITTED
+                        </div>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => handleApproveReceipt(shipment)}
+                          disabled={shipmentActionId === shipment.id}
+                          className="w-full py-2.5 px-4 rounded-xl bg-volt text-volt-text font-bold text-xs shadow-sm hover:bg-volt-hover active:scale-[0.99] transition-colors flex items-center justify-center space-x-1.5 disabled:opacity-50 focus-visible:ring-2 focus-visible:ring-[#FFD400]"
+                        >
+                          <CheckCheck className="w-3.5 h-3.5" />
+                          <span>
+                            {shipmentActionId === shipment.id
+                              ? 'Committing to SAP S/4HANA...'
+                              : 'Approve Goods Receipt & Increase SAP Stock'}
+                          </span>
+                        </button>
                       )}
                     </div>
                   </div>
-                ))}
-              </div>
+                );
+              })}
             </div>
           )}
         </div>
+      )}
 
-        {/* Right Column: Physical Stock Count Form (5 Cols) */}
-        <div className="lg:col-span-5 space-y-4">
-          <div className="glass-panel p-5 sm:p-6 rounded-3xl border border-[#e0e8e2]/15 bg-[#2c2e35]/90 shadow-2xl space-y-5">
-            <div className="border-b border-[#e0e8e2]/10 pb-3 flex items-center justify-between">
+      {/* ========================================================================= */}
+      {/* TAB 2: OUTGOING DISPATCH APPROVALS (-SAP STOCK COMMITTED)                 */}
+      {/* ========================================================================= */}
+      {activeTab === 'DISPATCH' && (
+        <div className="rounded-xl bg-abyss-card border border-sand-border p-5 shadow-sm space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-sand-border pb-3 gap-2">
+            <div className="flex items-center space-x-2">
+              <Truck className="w-5 h-5 text-volt" />
               <div>
-                <h3 className="text-base font-bold text-white tracking-tight">
-                  Physical Stock Count Audit
+                <h3 className="text-sm font-bold uppercase tracking-wider text-abyss-text">
+                  Tab 2: Outgoing Dispatch Approvals (-SAP Stock)
                 </h3>
-                <p className="text-[11px] text-[#e0e8e2]/60 font-mono">
-                  Sync physical shelf counts directly into SAP RFC
+                <p className="text-[11px] text-abyss-muted font-mono">
+                  Reallocations originating from {assignedHospitalId}. Stock is deducted live in SAP ZPULSE_INV upon Shopkeeper physical release.
                 </p>
               </div>
-              <span className="text-xs font-mono font-bold text-[#89c07e] px-2 py-0.5 rounded bg-[#467750]/30 border border-[#89c07e]/40">
-                H004 - BHOPAL
-              </span>
+            </div>
+            <span className="px-2 py-0.5 rounded text-xs font-mono font-bold bg-volt text-volt-text self-start sm:self-auto">
+              {outgoingDispatches.length} Outbound Pending
+            </span>
+          </div>
+
+          {outgoingDispatches.length === 0 ? (
+            <div className="py-12 text-center text-xs font-mono text-abyss-muted border border-dashed border-sand-border rounded-xl space-y-2">
+              <div className="w-10 h-10 mx-auto rounded-full bg-abyss-elevated flex items-center justify-center text-volt">
+                <CheckCheck className="w-5 h-5" />
+              </div>
+              <div className="font-bold text-abyss-text">No outgoing dispatches currently pending for facility {assignedHospitalId}.</div>
+              <p className="text-[10px] text-abyss-muted">
+                Approved reallocations where this facility is donor will appear here for physical dispatch.
+              </p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {outgoingDispatches.map((shipment) => (
+                <div
+                  key={shipment.id}
+                  className="p-4 rounded-xl bg-abyss-elevated border border-sand-border space-y-3 font-mono text-xs"
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-1.5 font-bold text-abyss-text">
+                      <span>{shipment.id}</span>
+                      <CopyButton text={shipment.id} label="Copy Shipment ID" />
+                    </div>
+                    <span className="px-2 py-0.5 rounded text-[10px] bg-sand-base text-sand-text font-bold">
+                      {shipment.status}
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2 text-[11px]">
+                    <div>
+                      <span className="text-abyss-muted block text-[9px] uppercase">Material</span>
+                      <div className="flex items-center gap-1">
+                        <strong className="text-volt">{shipment.material_id}</strong>
+                        <CopyButton text={shipment.material_id} label="Copy Material ID" />
+                      </div>
+                    </div>
+                    <div>
+                      <span className="text-abyss-muted block text-[9px] uppercase">Quantity</span>
+                      <strong className="text-abyss-text">{shipment.qty} Units</strong>
+                    </div>
+                    <div>
+                      <span className="text-abyss-muted block text-[9px] uppercase">Destination</span>
+                      <strong className="text-abyss-text">{shipment.dest_hospital_id}</strong>
+                    </div>
+                    <div>
+                      <span className="text-abyss-muted block text-[9px] uppercase">Order Type</span>
+                      <strong className="text-abyss-text">{shipment.order_type}</strong>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center space-x-2 pt-2 border-t border-sand-border">
+                    <button
+                      type="button"
+                      onClick={() => handleApproveDispatch(shipment)}
+                      disabled={shipmentActionId === shipment.id}
+                      className="flex-1 py-2 px-3 rounded-lg bg-volt text-volt-text font-bold text-xs shadow-sm hover:bg-volt-hover active:scale-[0.99] transition-colors flex items-center justify-center space-x-1.5 disabled:opacity-50 focus-visible:ring-2 focus-visible:ring-[#FFD400]"
+                    >
+                      <CheckCheck className="w-3.5 h-3.5" />
+                      <span>
+                        {shipmentActionId === shipment.id ? 'Deducting in SAP...' : 'Approve Dispatch (-SAP)'}
+                      </span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleRejectDispatch(shipment)}
+                      disabled={shipmentActionId === shipment.id}
+                      className="px-3 py-2 rounded-lg bg-abyss-card border border-sand-border text-abyss-muted hover:text-red-400 hover:border-red-500/40 font-bold text-xs transition-colors disabled:opacity-50 flex items-center gap-1"
+                      title="Reject Dispatch"
+                    >
+                      <XCircle className="w-3.5 h-3.5" />
+                      <span>Reject</span>
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* TAB 3: PHYSICAL STOCK COUNT LEDGER (STRICTLY LOCKED TO HOSPITAL)          */}
+      {/* ========================================================================= */}
+      {activeTab === 'AUDIT' && (
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
+          {/* Left Column: Assigned Facility Inventory Ledger (7 Cols) */}
+          <div className="lg:col-span-7 space-y-4">
+            <div className="rounded-xl bg-abyss-card border border-sand-border p-5 shadow-sm space-y-4">
+              <div className="flex items-center justify-between border-b border-sand-border pb-3">
+                <div className="flex items-center space-x-2">
+                  <ClipboardList className="w-4 h-4 text-volt" />
+                  <h3 className="text-sm font-bold uppercase tracking-wider text-abyss-text">
+                    Facility {assignedHospitalId} Physical Inventory Ledger
+                  </h3>
+                </div>
+                <span className="text-[10px] font-mono text-abyss-muted">
+                  Last updated: {lastUpdated}
+                </span>
+              </div>
+
+              {facilityInventory.length === 0 ? (
+                <div className="py-8 text-center text-xs font-mono text-abyss-muted">
+                  No inventory records found for facility {assignedHospitalId}.
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left font-mono text-xs">
+                    <thead>
+                      <tr className="border-b border-sand-border text-[10px] text-abyss-muted uppercase tracking-wider bg-abyss-elevated">
+                        <th className="py-2.5 px-3">Medicine ID</th>
+                        <th className="py-2.5 px-3 text-right">Physical Stock</th>
+                        <th className="py-2.5 px-3 text-right">Daily Use</th>
+                        <th className="py-2.5 px-3 text-right">Cover</th>
+                        <th className="py-2.5 px-3 text-center">Status</th>
+                        <th className="py-2.5 px-3 text-center">Action</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-sand-border">
+                      {facilityInventory.map((item) => {
+                        const isSelected = selectedMaterial === item.MATERIAL_ID;
+                        const days = item.daysCover ?? Math.floor(item.STOCK_QTY / (item.DAILY_USE || 1));
+                        const isCritical = days < 5;
+
+                        return (
+                          <tr
+                            key={item.MATERIAL_ID}
+                            onClick={() => handleSelectItem(item)}
+                            className={`cursor-pointer transition-colors hover:bg-abyss-elevated ${
+                              isSelected ? 'bg-abyss-elevated' : ''
+                            }`}
+                          >
+                            <td className="py-2.5 px-3 font-bold text-abyss-text flex items-center space-x-2">
+                              <Package className="w-3.5 h-3.5 text-volt" />
+                              <span>{item.MATERIAL_ID}</span>
+                              <CopyButton text={item.MATERIAL_ID} label="Copy Material ID" />
+                            </td>
+                            <td className="py-2.5 px-3 text-right font-bold text-abyss-text">
+                              {item.STOCK_QTY} <span className="text-[10px] text-abyss-muted">{item.UNIT || 'EA'}</span>
+                            </td>
+                            <td className="py-2.5 px-3 text-right text-abyss-muted">
+                              {item.DAILY_USE}
+                            </td>
+                            <td className="py-2.5 px-3 text-right">
+                              <span
+                                className={`px-2 py-0.5 rounded text-[11px] font-bold ${
+                                  isCritical
+                                    ? 'bg-volt text-volt-text font-black'
+                                    : 'bg-sand-base text-sand-text'
+                                }`}
+                              >
+                                {days}d
+                              </span>
+                            </td>
+                            <td className="py-2.5 px-3 text-center">
+                              {isCritical ? (
+                                <span className="inline-flex items-center space-x-1 text-[10px] text-volt font-bold">
+                                  <AlertTriangle className="w-3 h-3 text-volt" />
+                                  <span>Deficit</span>
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center space-x-1 text-[10px] text-abyss-text font-bold">
+                                  <CheckCircle2 className="w-3 h-3 text-sand-border" />
+                                  <span>Adequate</span>
+                                </span>
+                              )}
+                            </td>
+                            <td className="py-2.5 px-3 text-center">
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleSelectItem(item);
+                                }}
+                                className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase transition-colors ${
+                                  isSelected
+                                    ? 'bg-volt text-volt-text'
+                                    : 'bg-abyss-card text-abyss-muted hover:text-abyss-text border border-sand-border'
+                                }`}
+                              >
+                                Select
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
 
-            {/* Submission Result Toast */}
-            {submitResult && (
-              <div
-                className={`p-3.5 rounded-2xl border text-xs flex items-start space-x-2.5 animate-in fade-in ${
-                  submitResult.type === 'success'
-                    ? 'bg-[#467750]/30 border-[#89c07e]/50 text-[#e0e8e2]'
-                    : 'bg-red-950/80 border-red-500/50 text-red-200'
-                }`}
-              >
-                {submitResult.type === 'success' ? (
-                  <CheckCircle2 className="w-4 h-4 text-[#89c07e] shrink-0 mt-0.5" />
-                ) : (
-                  <AlertTriangle className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />
-                )}
-                <div>
-                  <div className="font-bold">{submitResult.message}</div>
-                  {submitResult.data?.shortageAlertTriggered && (
-                    <div className="text-[11px] text-[#f0cd6e] mt-1 flex items-center gap-1">
-                      <Mail className="w-3 h-3" />
-                      <span>Alerts sent to manager@pulsechain.com & supplier@pulsechain.com</span>
+            {/* Audit History Log */}
+            {recentAudits.length > 0 && (
+              <div className="rounded-xl bg-abyss-card border border-sand-border p-5 shadow-sm space-y-3">
+                <div className="flex items-center justify-between border-b border-sand-border pb-2">
+                  <span className="text-xs font-bold font-mono uppercase text-abyss-text flex items-center gap-1.5">
+                    <Activity className="w-3.5 h-3.5 text-volt" />
+                    <span>Recent Shift Physical Audit History</span>
+                  </span>
+                  <span className="text-[10px] font-mono text-abyss-muted">
+                    {recentAudits.length} Recorded
+                  </span>
+                </div>
+                <div className="space-y-2 max-h-48 overflow-y-auto">
+                  {recentAudits.map((a) => (
+                    <div
+                      key={a.id}
+                      className="p-2.5 rounded-lg bg-abyss-elevated border border-sand-border flex items-center justify-between text-xs font-mono"
+                    >
+                      <div className="flex items-center space-x-2">
+                        <span className="text-[10px] text-abyss-muted">{a.timestamp}</span>
+                        <strong className="text-abyss-text">{a.materialId}</strong>
+                        <span className="text-abyss-muted">Stock: {a.stockQty}</span>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <span
+                          className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
+                            a.daysCover < 5 ? 'bg-volt text-volt-text font-black' : 'bg-sand-base text-sand-text'
+                          }`}
+                        >
+                          {a.daysCover}d cover
+                        </span>
+                        {a.alertTriggered && (
+                          <span className="text-[10px] text-volt flex items-center gap-1">
+                            <Mail className="w-3 h-3 text-volt" />
+                            <span>Alert Dispatched</span>
+                          </span>
+                        )}
+                      </div>
                     </div>
-                  )}
+                  ))}
                 </div>
               </div>
             )}
+          </div>
 
-            <form onSubmit={handleSubmitCount} className="space-y-4">
-              {/* Select Material */}
-              <div>
-                <label className="block text-xs font-mono uppercase text-[#e0e8e2]/70 mb-1.5 font-bold">
-                  Medicine / Material Item
-                </label>
-                <select
-                  value={selectedMaterial}
-                  onChange={(e) => setSelectedMaterial(e.target.value)}
-                  className="w-full px-3.5 py-2.5 rounded-2xl bg-[#2a3f3f]/60 border border-[#e0e8e2]/15 text-xs text-white focus:outline-none focus:border-[#89c07e]/60 font-mono"
-                >
-                  {facilityInventory.map((item) => (
-                    <option key={item.MATERIAL_ID} value={item.MATERIAL_ID}>
-                      {item.MATERIAL_ID} ({item.UNIT}) - Currently {item.STOCK_QTY} on hand
-                    </option>
-                  ))}
-                </select>
+          {/* Right Column: Physical Stock Audit Submission Form (5 Cols) */}
+          <div className="lg:col-span-5 space-y-4">
+            <div className="rounded-xl bg-abyss-card border border-sand-border p-5 shadow-sm space-y-4">
+              <div className="border-b border-sand-border pb-3">
+                <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-volt block">
+                  Auditor Physical Count Input
+                </span>
+                <h3 className="text-base font-bold text-abyss-text tracking-tight mt-0.5">
+                  Update Stock Level in SAP
+                </h3>
+                <p className="text-xs text-abyss-muted font-mono mt-0.5">
+                  Commits real-time physical count to SAP Gateway <code className="text-abyss-text">ZPLUSE_SRV</code>.
+                </p>
               </div>
 
-              {/* Physical Stock Qty Input */}
-              <div>
-                <label className="block text-xs font-mono uppercase text-[#e0e8e2]/70 mb-1.5 font-bold">
-                  Verified Physical Stock Quantity (Units)
-                </label>
-                <input
-                  type="number"
-                  min="0"
-                  step="1"
-                  required
-                  value={stockQty}
-                  onChange={(e) => setStockQty(e.target.value)}
-                  className="w-full px-3.5 py-2.5 rounded-2xl bg-[#2a3f3f]/60 border border-[#e0e8e2]/15 text-base font-black text-white focus:outline-none focus:border-[#89c07e]/60 font-mono"
-                />
-              </div>
-
-              {/* Daily Consumption Rate Input */}
-              <div>
-                <label className="block text-xs font-mono uppercase text-[#e0e8e2]/70 mb-1.5 font-bold">
-                  Average Daily Consumption Rate (Units / Day)
-                </label>
-                <input
-                  type="number"
-                  min="1"
-                  step="1"
-                  required
-                  value={dailyUse}
-                  onChange={(e) => setDailyUse(e.target.value)}
-                  className="w-full px-3.5 py-2.5 rounded-2xl bg-[#2a3f3f]/60 border border-[#e0e8e2]/15 text-sm font-bold text-white focus:outline-none focus:border-[#89c07e]/60 font-mono"
-                />
-              </div>
-
-              {/* LIVE REAL-TIME DAYS OF COVER & ALERT TRIGGER TELEMETRY */}
-              <div
-                className={`p-4 rounded-2xl border transition-all ${
-                  isCriticalDeficit
-                    ? 'bg-red-950/40 border-red-500/50 shadow-lg shadow-red-950/30'
-                    : 'bg-[#467750]/20 border-[#89c07e]/40'
-                }`}
-              >
-                <div className="flex items-center justify-between mb-1">
-                  <span className="text-[11px] font-mono uppercase tracking-wider font-bold text-[#e0e8e2]/70">
-                    Live Projected Days of Cover
-                  </span>
-                  <span
-                    className={`text-lg font-black font-mono ${
-                      isCriticalDeficit ? 'text-red-400' : 'text-[#89c07e]'
-                    }`}
+              <form onSubmit={handleSubmitCount} className="space-y-3 font-mono text-xs">
+                <div>
+                  <label className="block text-[11px] text-abyss-muted mb-1 font-bold">
+                    Medicine / Material ID
+                  </label>
+                  <select
+                    value={selectedMaterial}
+                    onChange={(e) => {
+                      setSelectedMaterial(e.target.value);
+                      const match = facilityInventory.find((i) => i.MATERIAL_ID === e.target.value);
+                      if (match) {
+                        setStockQty(match.STOCK_QTY);
+                        setDailyUse(match.DAILY_USE);
+                      }
+                    }}
+                    className="w-full px-3 py-2 rounded-lg bg-abyss-elevated border border-sand-border text-abyss-text focus:outline-none focus:border-volt"
                   >
-                    {liveDaysCover} Days
-                  </span>
+                    {facilityInventory.map((item) => (
+                      <option key={item.MATERIAL_ID} value={item.MATERIAL_ID}>
+                        {item.MATERIAL_ID} ({item.CITY} • Current: {item.STOCK_QTY} {item.UNIT})
+                      </option>
+                    ))}
+                  </select>
                 </div>
 
-                {isCriticalDeficit ? (
-                  <div className="space-y-1.5 pt-1 border-t border-red-500/20 text-xs">
-                    <div className="flex items-center space-x-1.5 text-red-300 font-bold">
-                      <AlertTriangle className="w-4 h-4 text-red-400 shrink-0 animate-bounce" />
-                      <span>CRITICAL SHORTAGE WARNING (&lt; 5 Days)</span>
-                    </div>
-                    <p className="text-[11px] text-[#e0e8e2]/80 leading-relaxed font-sans">
-                      Submitting this count will <strong>automatically trigger dual Nodemailer email alerts</strong>:
-                    </p>
-                    <ul className="text-[10px] font-mono text-[#f0cd6e] list-disc list-inside space-y-0.5">
-                      <li>Critical Shortage Alert to Central Manager (manager@pulsechain.com)</li>
-                      <li>Urgent Emergency RFQ to Regional Suppliers (supplier@pulsechain.com)</li>
-                    </ul>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[11px] text-abyss-muted mb-1 font-bold">
+                      Physical Stock Count
+                    </label>
+                    <input
+                      type="number"
+                      required
+                      min="0"
+                      value={stockQty}
+                      onChange={(e) => setStockQty(e.target.value)}
+                      className="w-full px-3 py-2 rounded-lg bg-abyss-elevated border border-sand-border text-abyss-text focus:outline-none focus:border-volt font-bold"
+                    />
                   </div>
-                ) : (
-                  <div className="flex items-center space-x-1.5 text-xs text-[#89c07e] font-sans pt-1">
-                    <CheckCircle2 className="w-3.5 h-3.5" />
-                    <span>Inventory buffer is safe (above 5-day safety threshold).</span>
-                  </div>
-                )}
-              </div>
 
-              {/* Submit Button */}
-              <button
-                type="submit"
-                disabled={submitting}
-                className="w-full py-3 rounded-2xl font-black text-xs uppercase tracking-wider bg-gradient-to-r from-amber-500 via-orange-500 to-amber-400 text-slate-950 shadow-lg shadow-orange-500/30 hover:brightness-110 active:scale-95 transition-all flex items-center justify-center space-x-2 disabled:opacity-50"
-              >
-                {submitting ? (
-                  <span>Recording in SAP RFC & Sending Alerts...</span>
-                ) : (
-                  <>
-                    <span>Submit Verified Count to SAP</span>
-                    <Send className="w-3.5 h-3.5 text-slate-950" />
-                  </>
-                )}
-              </button>
-            </form>
+                  <div>
+                    <label className="block text-[11px] text-abyss-muted mb-1 font-bold">
+                      Daily Consumption
+                    </label>
+                    <input
+                      type="number"
+                      required
+                      min="1"
+                      value={dailyUse}
+                      onChange={(e) => setDailyUse(e.target.value)}
+                      className="w-full px-3 py-2 rounded-lg bg-abyss-elevated border border-sand-border text-abyss-text focus:outline-none focus:border-volt"
+                    />
+                  </div>
+                </div>
+
+                {/* Live Buffer Projection Card */}
+                <div
+                  className={`p-3.5 rounded-lg border flex items-center justify-between ${
+                    isCriticalDeficit
+                      ? 'bg-volt/10 border-volt/40 text-volt'
+                      : 'bg-abyss-elevated border-sand-border text-abyss-text'
+                  }`}
+                >
+                  <div>
+                    <div className="text-[10px] text-abyss-muted uppercase">Projected Days of Cover</div>
+                    <div className="text-xl font-black">{liveDaysCover} Days</div>
+                  </div>
+                  <div className="text-right">
+                    <span
+                      className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                        isCriticalDeficit ? 'bg-volt text-volt-text font-black' : 'bg-sand-base text-sand-text'
+                      }`}
+                    >
+                      {isCriticalDeficit ? 'CRITICAL SHORTAGE' : 'ADEQUATE BUFFER'}
+                    </span>
+                    <div className="text-[9px] text-abyss-muted mt-0.5">Threshold: 5 Days</div>
+                  </div>
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={submitting}
+                  className="w-full py-2.5 px-4 rounded-xl bg-volt text-volt-text font-bold text-xs uppercase tracking-wide hover:bg-volt-hover active:scale-[0.99] transition-colors flex items-center justify-center space-x-1.5 disabled:opacity-50 focus-visible:ring-2 focus-visible:ring-[#FFD400]"
+                >
+                  <Send className="w-3.5 h-3.5" />
+                  <span>{submitting ? 'Recording in SAP S/4HANA...' : 'Commit Count to SAP S/4HANA'}</span>
+                </button>
+              </form>
+
+              {submitResult && (
+                <div
+                  className={`p-3 rounded-lg border text-xs font-mono ${
+                    submitResult.type === 'success'
+                      ? 'bg-sand-base text-sand-text border-sand-border'
+                      : 'bg-red-500/10 border-red-500/30 text-red-300'
+                  }`}
+                >
+                  <div className="font-bold">{submitResult.message}</div>
+                  {submitResult.data?.shortageAlertTriggered && (
+                    <div className="mt-1 text-[11px] text-abyss-canvas font-bold flex items-center gap-1">
+                      <Mail className="w-3.5 h-3.5" />
+                      <span>Alert email automatically dispatched to hospital manager and regional authority.</span>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
         </div>
-      </div>
+      )}
+
+      {/* Global Accessible Confirm Modal */}
+      <ConfirmModal
+        isOpen={confirmDialog.isOpen}
+        title={confirmDialog.title}
+        message={confirmDialog.message}
+        confirmLabel={confirmDialog.confirmLabel}
+        isDestructive={confirmDialog.isDestructive}
+        onConfirm={confirmDialog.onConfirm}
+        onClose={() => setConfirmDialog((prev) => ({ ...prev, isOpen: false }))}
+      />
     </div>
   );
 }

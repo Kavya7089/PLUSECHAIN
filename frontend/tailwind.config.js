@@ -8,43 +8,38 @@ export default {
   theme: {
     extend: {
       colors: {
-        palette: {
-          charcoal: '#2c2e35',
-          teal: '#2a3f3f',
-          forest: '#467750',
-          mint: '#89c07e',
-          mist: '#e0e8e2',
-          gold: '#f0cd6e',
+        // Strict 60-30-10 System:
+        // 60% Main — Abyss Teal
+        abyss: {
+          canvas: 'var(--color-abyss-canvas)',
+          card: 'var(--color-abyss-card)',
+          elevated: 'var(--color-abyss-elevated)',
+          border: 'var(--color-abyss-border)',
+          text: 'var(--color-abyss-text)',
+          muted: 'var(--color-abyss-muted)',
         },
-        pulse: {
-          50: '#f7faf7',
-          100: '#e0e8e2',
-          200: '#c5d8c8',
-          300: '#89c07e',
-          400: '#5e9f68',
-          500: '#467750',
-          600: '#345b3c',
-          700: '#2a3f3f',
-          800: '#2c2e35',
-          900: '#1e2025',
-          950: '#14161a',
+        // 30% Secondary — Sand Putty
+        sand: {
+          base: 'var(--color-sand-base)',
+          surface: 'var(--color-sand-surface)',
+          border: 'var(--color-sand-border)',
+          text: 'var(--color-sand-text)',
+          muted: 'var(--color-sand-muted)',
+        },
+        // 10% Accent — Taxi Volt
+        volt: {
+          DEFAULT: '#FFD400',
+          hover: '#E6BF00',
+          text: '#081F20',
         },
       },
       fontFamily: {
-        mono: ['JetBrains Mono', 'Fira Code', 'Consolas', 'monospace'],
-        sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
+        sans: ['"Plus Jakarta Sans"', 'system-ui', '-apple-system', 'sans-serif'],
+        mono: ['"IBM Plex Mono"', 'monospace'],
       },
       animation: {
         'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
-        'spin-slow': 'spin 8s linear infinite',
-        'float-slow': 'float 6s ease-in-out infinite',
       },
-      keyframes: {
-        float: {
-          '0%, 100%': { transform: 'translateY(0px)' },
-          '50%': { transform: 'translateY(-10px)' },
-        }
-      }
     },
   },
   plugins: [],

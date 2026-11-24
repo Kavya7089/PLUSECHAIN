@@ -13,6 +13,7 @@ const bcrypt = require('bcryptjs');
 const nodemailer = require('nodemailer');
 const { GoogleGenAI } = require('@google/genai');
 const fs = require('fs');
+const path = require('path');
 
 // Initialize GoogleGenAI SDK with process.env.GEMINI_API_KEY
 let aiClient = null;
@@ -28,12 +29,47 @@ if (process.env.GEMINI_API_KEY) {
 // Live Gateway Endpoint: https://merida.cob.csuchico.edu:8038/sap/opu/odata/sap/ZPLUSE_SRV?sap-client=105
 const sapAdapter = require('./sapAdapter');
 
+// Supabase Auth, PostgreSQL RLS & External Services
+const { requireAuth, requireRole, ROLE_ALIASES } = require('./authMiddleware');
+const { calculateRoute } = require('./geoRoutingService');
+const { getExternalRisk, recommendSuppliers } = require('./externalSensingService');
+const {
+  logStockAuditToSupabase,
+  logReallocationToSupabase,
+  createSupplierBidInSupabase,
+  getSupplierBidsFromSupabase,
+  updateSupplierBidStatusInSupabase,
+  createShipmentApprovalInSupabase,
+  getShipmentApprovalsFromSupabase,
+  updateShipmentApprovalInSupabase,
+  createSupplierReviewInSupabase,
+  getSupplierReviewsFromSupabase,
+  createHospitalTaskInSupabase,
+  getHospitalTasksFromSupabase,
+  supabaseAdmin,
+} = require('./supabaseClient');
+
 const app = express();
 const PORT = process.env.PORT || 5000;
 const JWT_SECRET = process.env.JWT_SECRET || 'pulsechain-enterprise-secret-key-2026';
 const MANAGER_EMAIL = process.env.MANAGER_EMAIL || 'manager@pulsechain.com';
 const SUPPLIER_EMAIL = process.env.SUPPLIER_EMAIL || 'supplier@pulsechain.com';
 
+// Optional auth helper: extracts user from Bearer token if provided, defaults to REGIONAL_ADMIN if unauthenticated
+async function optionalAuth(req, res, next) {
+  const authHeader = req.headers.authorization || req.headers['x-access-token'];
+  if (authHeader) {
+    return requireAuth(req, res, next);
+  }
+  req.user = {
+    role: 'REGIONAL_ADMIN',
+    hospital_id: null,
+    supplier_id: null,
+    city: 'ALL',
+    isAnonymous: true,
+  };
+  return next();
+}
 
 app.use(cors());
 app.use(express.json());
@@ -47,76 +83,142 @@ const DEMO_PASSWORD_HASH = bcrypt.hashSync(DEMO_PASSWORD, 10);
 const DEMO_USERS = [
   {
     id: 'U001',
-    name: 'Kavya Rajoria',
-    email: 'manager@pulsechain.com',
+    name: 'Dr. Kavya Rajoria',
+    email: 'manager.h004@pulsechain.org',
+    aliases: ['kavyarajoria9691@gmail.com', 'manager@pulsechain.com'],
     passwordHash: DEMO_PASSWORD_HASH,
-    role: 'INVENTORY_MANAGER',
+    role: 'HOSPITAL_MANAGER',
+    legacyRole: 'INVENTORY_MANAGER',
     city: 'BHOPAL',
-    hospitalId: 'H005',
+    hospitalId: 'H004',
     supplierId: null,
     avatar: 'KR',
   },
   {
     id: 'U002',
     name: 'Sejal Tiwari',
-    email: 'shopkeeper@pulsechain.com',
+    email: 'shopkeeper.h004@pulsechain.org',
+    aliases: ['tiwarisejal80@gmail.com', 'shopkeeper@pulsechain.com'],
     passwordHash: DEMO_PASSWORD_HASH,
-    role: 'STOCK_COUNTER',
+    role: 'SHOPKEEPER',
+    legacyRole: 'STOCK_COUNTER',
     city: 'BHOPAL',
     hospitalId: 'H004',
     supplierId: null,
+    warehouseBay: 'COLD_CHAIN_BAY_1',
     avatar: 'ST',
   },
   {
     id: 'U003',
+    name: 'Manager Hub H005',
+    email: 'manager.h005@pulsechain.org',
+    aliases: ['kavyarajoriakr@gmail.com', 'kavyarajoriakr@gmal.com'],
+    passwordHash: DEMO_PASSWORD_HASH,
+    role: 'HOSPITAL_MANAGER',
+    legacyRole: 'INVENTORY_MANAGER',
+    city: 'BHOPAL',
+    hospitalId: 'H005',
+    supplierId: null,
+    avatar: 'H5',
+  },
+  {
+    id: 'U004',
+    name: 'Manager Hub H006',
+    email: 'manager.h006@pulsechain.org',
+    aliases: ['manager_indore@pulsechain.com'],
+    passwordHash: DEMO_PASSWORD_HASH,
+    role: 'HOSPITAL_MANAGER',
+    legacyRole: 'INVENTORY_MANAGER',
+    city: 'INDORE',
+    hospitalId: 'H006',
+    supplierId: null,
+    avatar: 'H6',
+  },
+  {
+    id: 'U005',
     name: 'Saumay Dubey',
-    email: 'supplier@pulsechain.com',
+    fullName: 'Saumay Dubey (MediSupply)',
+    full_name: 'Saumay Dubey (MediSupply)',
+    email: 'v1001@medisupply.in',
+    aliases: ['soumaydubey073@gmail.com', 'supplier@pulsechain.com'],
     passwordHash: DEMO_PASSWORD_HASH,
     role: 'SUPPLIER',
-    city: 'FRANKFURT',
+    city: 'BHOPAL',
     hospitalId: null,
     supplierId: 'V1001',
     avatar: 'SD',
   },
+  {
+    id: 'U006',
+    name: 'BioCare Logistics India',
+    email: 'v1002@biocare.in',
+    aliases: ['0111cd23058@technocratsgroup.edu.in'],
+    passwordHash: DEMO_PASSWORD_HASH,
+    role: 'SUPPLIER',
+    city: 'INDORE',
+    hospitalId: null,
+    supplierId: 'V1002',
+    avatar: 'BC',
+  },
+  {
+    id: 'U007',
+    name: 'FastMed Cold-Chain Express',
+    email: 'v1003@fastmed.in',
+    passwordHash: DEMO_PASSWORD_HASH,
+    role: 'SUPPLIER',
+    city: 'JABALPUR',
+    hospitalId: null,
+    supplierId: 'V1003',
+    avatar: 'FM',
+  },
+  {
+    id: 'U008',
+    name: 'Madhya Pradesh Regional Health Admin',
+    email: 'regional.head@pulsechain.org',
+    aliases: ['kavyarajoria2552@gmail.com', 'admin@pulsechain.com'],
+    passwordHash: DEMO_PASSWORD_HASH,
+    role: 'REGIONAL_HEAD',
+    legacyRole: 'REGIONAL_ADMIN',
+    city: 'ALL',
+    hospitalId: null,
+    supplierId: null,
+    avatar: 'RA',
+  },
+  {
+    id: 'U009',
+    name: 'Shopkeeper H005 Hub',
+    email: 'shopkeeper.h005@pulsechain.org',
+    passwordHash: DEMO_PASSWORD_HASH,
+    role: 'SHOPKEEPER',
+    legacyRole: 'STOCK_COUNTER',
+    city: 'BHOPAL',
+    hospitalId: 'H005',
+    supplierId: null,
+    warehouseBay: 'MAIN_DISPATCH_DOCK_2',
+    avatar: 'S5',
+  },
+  {
+    id: 'U010',
+    name: 'Shopkeeper H006 Indore',
+    email: 'shopkeeper.h006@pulsechain.org',
+    passwordHash: DEMO_PASSWORD_HASH,
+    role: 'SHOPKEEPER',
+    legacyRole: 'STOCK_COUNTER',
+    city: 'INDORE',
+    hospitalId: 'H006',
+    supplierId: null,
+    warehouseBay: 'INDORE_COLD_BAY_3',
+    avatar: 'S6',
+  },
 ];
 
-// Reusable Role-Verification Middleware
+// Reusable Role-Verification Middleware (Supports Supabase Auth & Local JWT)
 function verifyRole(allowedRoles = []) {
   return (req, res, next) => {
-    const authHeader = req.headers.authorization || req.headers['x-access-token'];
-    let token = null;
-
-    if (authHeader && authHeader.startsWith('Bearer ')) {
-      token = authHeader.split(' ')[1];
-    } else if (authHeader) {
-      token = authHeader;
-    }
-
-    if (!token) {
-      return res.status(401).json({
-        success: false,
-        message: 'Authentication token required. Please sign in.',
-      });
-    }
-
-    try {
-      const decoded = jwt.verify(token, JWT_SECRET);
-      req.user = decoded;
-
-      if (allowedRoles.length > 0 && !allowedRoles.includes(decoded.role)) {
-        return res.status(403).json({
-          success: false,
-          message: `Access denied: Role "${decoded.role}" is not authorized. Allowed roles: ${allowedRoles.join(', ')}`,
-        });
-      }
-
-      next();
-    } catch (err) {
-      return res.status(401).json({
-        success: false,
-        message: 'Invalid or expired authentication token. Please sign in again.',
-      });
-    }
+    return requireAuth(req, res, () => {
+      if (allowedRoles.length === 0) return next();
+      return requireRole(...allowedRoles)(req, res, next);
+    });
   };
 }
 
@@ -124,6 +226,8 @@ function verifyRole(allowedRoles = []) {
 // 2. AUTOMATED EMAIL UTILITY (Nodemailer with Safe Fallback / Simulation)
 // =========================================================================
 let mailTransporter = null;
+let smtpAuthFailed = false;
+
 if (process.env.EMAIL_USER && process.env.EMAIL_PASS) {
   try {
     mailTransporter = nodemailer.createTransport({
@@ -141,7 +245,7 @@ if (process.env.EMAIL_USER && process.env.EMAIL_PASS) {
 async function sendAlertEmail(to, subject, htmlBody) {
   const timestamp = new Date().toISOString();
 
-  if (mailTransporter && process.env.EMAIL_USER && process.env.EMAIL_PASS) {
+  if (mailTransporter && process.env.EMAIL_USER && process.env.EMAIL_PASS && !smtpAuthFailed) {
     try {
       const info = await mailTransporter.sendMail({
         from: `"PulseChain Resiliency Engine" <${process.env.EMAIL_USER}>`,
@@ -152,21 +256,17 @@ async function sendAlertEmail(to, subject, htmlBody) {
       console.log(`[EMAIL DISPATCHED] To: ${to} | Subject: "${subject}" | MsgId: ${info.messageId}`);
       return { success: true, simulated: false, messageId: info.messageId, to, subject, timestamp };
     } catch (err) {
-      console.warn(`[EMAIL ERROR] SMTP send failed: ${err.message}. Gracefully falling back to simulation.`);
+      if (err.responseCode === 535 || err.message?.includes('535') || err.code === 'EAUTH') {
+        smtpAuthFailed = true;
+        console.log('[EMAIL NOTICE] Gmail SMTP authentication requires a 16-character Google App Password (EMAIL_PASS). Operating in clean simulation mode.');
+      } else {
+        console.warn(`[EMAIL NOTICE] SMTP dispatch unavailable (${err.message}). Using simulation.`);
+      }
     }
   }
 
-  // Safe Fallback: Log full email payload to terminal with [EMAIL SIMULATION]
-  console.log('\n================== [EMAIL SIMULATION] ==================');
-  console.log(`📡 STATUS:    Simulated Dispatch (Safe Fallback)`);
-  console.log(`📨 TO:        ${to}`);
-  console.log(`📌 SUBJECT:   ${subject}`);
-  console.log(`⏱️ TIMESTAMP: ${timestamp}`);
-  console.log(`--------------------------------------------------------`);
-  const plainText = htmlBody.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
-  console.log(`📄 PREVIEW:   ${plainText.slice(0, 220)}...`);
-  console.log('========================================================\n');
-
+  // Safe Clean Simulation Logging
+  console.log(`[EMAIL SIMULATION] Dispatched to: ${to} | Subject: "${subject}" (${timestamp})`);
   return { success: true, simulated: true, to, subject, timestamp };
 }
 
@@ -451,6 +551,126 @@ let currentSuppliersState = [
 // =========================================================================
 
 /**
+ * POST /api/auth/register
+ * Dual-Sync Registration: Supabase Auth + live registration in SAP S/4HANA ZPULSE_USERS (UserSet)
+ */
+app.post('/api/auth/register', async (req, res) => {
+  const { email, password, full_name, role, hospital_id, supplier_id, city, region_name, warehouse_bay } = req.body;
+
+  if (!email || !password || !full_name) {
+    return res.status(400).json({
+      success: false,
+      message: 'Email, password, and full_name are required for registration.',
+    });
+  }
+
+  const cleanRole = (role || 'SHOPKEEPER').toUpperCase();
+  const canonicalRole = ROLE_ALIASES[cleanRole] || cleanRole;
+
+  let createdUser = null;
+  let sapSynced = false;
+  let userId = null;
+
+  // 1. Create in Supabase Auth if available
+  if (supabaseAdmin) {
+    try {
+      const { data, error } = await supabaseAdmin.auth.admin.createUser({
+        email,
+        password,
+        email_confirm: true,
+        user_metadata: {
+          full_name,
+          role: canonicalRole,
+          hospital_id: hospital_id || null,
+          supplier_id: supplier_id || null,
+          city: city || 'BHOPAL',
+          region_name: region_name || 'MP_CENTRAL_WEST',
+          warehouse_bay: warehouse_bay || 'COLD_CHAIN_BAY_1',
+        },
+      });
+
+      if (!error && data?.user) {
+        createdUser = data.user;
+        userId = data.user.id;
+      } else if (error && error.message.includes('already registered')) {
+        const { data: listData } = await supabaseAdmin.auth.admin.listUsers();
+        const existing = listData?.users?.find((u) => u.email.toLowerCase() === email.toLowerCase());
+        if (existing) {
+          createdUser = existing;
+          userId = existing.id;
+        }
+      }
+    } catch (err) {
+      console.warn(`[Register] Supabase admin creation note: ${err.message}`);
+    }
+  }
+
+  if (!userId) {
+    userId = `USER-${Date.now()}`;
+  }
+
+  // 2. Direct Sync to SAP Gateway S/4HANA UserSet
+  try {
+    const sapRes = await sapAdapter.registerUserInSap({
+      id: userId,
+      email,
+      fullName: full_name,
+      role: canonicalRole,
+      hospitalId: hospital_id,
+      supplierId: supplier_id,
+      city: city || 'BHOPAL',
+      region: region_name || 'MP_CENTRAL_WEST',
+      warehouseBay: warehouse_bay || 'COLD_CHAIN_BAY_1',
+      canApprove: true,
+      status: 'ACTIVE',
+    });
+    sapSynced = sapRes.success;
+  } catch (sapErr) {
+    console.warn(`[Register] SAP UserSet registration note: ${sapErr.message}`);
+  }
+
+  // Update sap_synced flag in user_profiles
+  if (supabaseAdmin && userId) {
+    try {
+      await supabaseAdmin.from('user_profiles').update({ sap_synced: sapSynced }).eq('id', userId);
+    } catch (e) {}
+  }
+
+  // Also add to in-memory DEMO_USERS so immediate login succeeds in local mode
+  const newDemoUser = {
+    id: userId,
+    name: full_name,
+    fullName: full_name,
+    email,
+    passwordHash: bcrypt.hashSync(password, 10),
+    role: canonicalRole,
+    city: city || 'BHOPAL',
+    hospitalId: hospital_id || null,
+    supplierId: supplier_id || null,
+    avatar: full_name.slice(0, 2).toUpperCase(),
+    sapSynced,
+  };
+  DEMO_USERS.push(newDemoUser);
+
+  return res.status(201).json({
+    success: true,
+    message: 'User registered successfully with dual Supabase and SAP S/4HANA synchronization.',
+    userId,
+    user: {
+      id: userId,
+      email,
+      full_name,
+      role: canonicalRole,
+      hospital_id,
+      supplier_id,
+      city,
+      sapSynced,
+    },
+    sapSynced,
+  });
+});
+
+/**
  * POST /api/auth/login
  * Role-based authentication returning JWT token & user profile
  */
@@ -464,30 +684,40 @@ app.post('/api/auth/login', (req, res) => {
     });
   }
 
+  const cleanEmail = email.trim().toLowerCase();
   const user = DEMO_USERS.find(
-    (u) => u.email.toLowerCase() === email.trim().toLowerCase()
+    (u) =>
+      u.email.toLowerCase() === cleanEmail ||
+      (Array.isArray(u.aliases) && u.aliases.some((a) => a.toLowerCase() === cleanEmail))
   );
 
   if (!user) {
     return res.status(401).json({
       success: false,
-      message: 'Invalid credentials. Demo accounts: manager@pulsechain.com, shopkeeper@pulsechain.com, supplier@pulsechain.com',
+      message: 'Invalid credentials. Demo accounts: kavyarajoria9691@gmail.com, tiwarisejal80@gmail.com, soumaydubey073@gmail.com, kavyarajoria2552@gmail.com',
     });
   }
 
-  const isPasswordValid = bcrypt.compareSync(password, user.passwordHash) || password === DEMO_PASSWORD;
+  const isPasswordValid =
+    bcrypt.compareSync(password, user.passwordHash) ||
+    password === DEMO_PASSWORD ||
+    password === 'Pulse@2026';
   if (!isPasswordValid) {
     return res.status(401).json({
       success: false,
-      message: 'Invalid password. Demo password is pass123',
+      message: 'Invalid password. Demo password is pass123 or Pulse@2026',
     });
   }
 
   const tokenPayload = {
     id: user.id,
     name: user.name,
-    email: user.email,
-    role: user.role,
+    fullName: user.fullName || user.name,
+    full_name: user.full_name || user.fullName || user.name,
+    email: cleanEmail,
+    primaryEmail: user.email,
+    role: user.legacyRole || user.role,
+    canonicalRole: user.role,
     city: user.city,
     hospitalId: user.hospitalId,
     supplierId: user.supplierId,
@@ -521,12 +751,37 @@ app.get('/api/auth/me', verifyRole(), (req, res) => {
  * GET /api/inventory
  * Connects to SAP Gateway OData v2 (ZPLUSE_SRV) over HTTPS
  * Falls back cleanly to local persistence cache when offline
+ * Enforces Multi-Tenant Scoping:
+ * - SHOPKEEPER / STOCK_COUNTER: only sees their own assigned hospital
+ * - HOSPITAL_MANAGER / INVENTORY_MANAGER: sees their own hospital + same-city peers
+ * - REGIONAL_ADMIN / Public: sees all facilities
  */
-app.get('/api/inventory', async (req, res) => {
+app.get('/api/inventory', optionalAuth, async (req, res) => {
   try {
     const result = await sapAdapter.getStockFromSap();
-    const records = result.data || currentStockState;
+    let records = result.data || currentStockState;
     currentStockState = records;
+
+    // Apply Tenant Scoping if authenticated user has restrictions
+    if (req.user && !req.user.isAnonymous) {
+      const userRole = (req.user.role || '').toUpperCase();
+      const userHospital = req.user.hospital_id || req.user.hospitalId;
+      const userCity = (req.user.city || '').toUpperCase();
+
+      if (['SHOPKEEPER', 'STOCK_COUNTER'].includes(userRole)) {
+        if (userHospital) {
+          records = records.filter((item) => item.HOSPITAL_ID === userHospital);
+        }
+      } else if (['HOSPITAL_MANAGER', 'INVENTORY_MANAGER'].includes(userRole)) {
+        if (userHospital || userCity) {
+          records = records.filter(
+            (item) => item.HOSPITAL_ID === userHospital || (item.CITY && item.CITY.toUpperCase() === userCity)
+          );
+        }
+      }
+      // REGIONAL_ADMIN sees all
+    }
+
     return res.status(200).json({
       success: true,
       source: result.source || 'LIVE_SAP_ODATA',
@@ -534,11 +789,29 @@ app.get('/api/inventory', async (req, res) => {
       data: records,
     });
   } catch (err) {
+    let records = currentStockState;
+    if (req.user && !req.user.isAnonymous) {
+      const userRole = (req.user.role || '').toUpperCase();
+      const userHospital = req.user.hospital_id || req.user.hospitalId;
+      const userCity = (req.user.city || '').toUpperCase();
+
+      if (['SHOPKEEPER', 'STOCK_COUNTER'].includes(userRole)) {
+        if (userHospital) {
+          records = records.filter((item) => item.HOSPITAL_ID === userHospital);
+        }
+      } else if (['HOSPITAL_MANAGER', 'INVENTORY_MANAGER'].includes(userRole)) {
+        if (userHospital || userCity) {
+          records = records.filter(
+            (item) => item.HOSPITAL_ID === userHospital || (item.CITY && item.CITY.toUpperCase() === userCity)
+          );
+        }
+      }
+    }
     return res.status(200).json({
       success: true,
       source: 'OFFLINE_SAP_CACHE',
       timestamp: new Date().toISOString(),
-      data: currentStockState,
+      data: records,
     });
   }
 });
@@ -605,8 +878,15 @@ app.get('/api/inventory/same-city/:hospitalId', (req, res) => {
  * Accepts { hospitalId, materialId, stockQty, dailyUse }
  * Calls SAP RFC Z_PULSE_COUNT_STOCK & triggers dual Nodemailer alert if daysCover < 5.
  */
-app.post('/api/stock-count', verifyRole(['STOCK_COUNTER', 'INVENTORY_MANAGER']), async (req, res) => {
-  const { hospitalId, materialId, stockQty, dailyUse } = req.body;
+app.post('/api/stock-count', verifyRole(['STOCK_COUNTER', 'SHOPKEEPER', 'INVENTORY_MANAGER', 'HOSPITAL_MANAGER', 'REGIONAL_ADMIN']), async (req, res) => {
+  let { hospitalId, materialId, stockQty, dailyUse } = req.body;
+
+  // Tenant scoping: Force hospitalId to user's assigned hospital if Shopkeeper
+  const userRole = (req.user?.role || '').toUpperCase();
+  const userHospital = req.user?.hospital_id || req.user?.hospitalId;
+  if (['STOCK_COUNTER', 'SHOPKEEPER'].includes(userRole) && userHospital) {
+    hospitalId = userHospital;
+  }
 
   if (!hospitalId || !materialId || stockQty === undefined || dailyUse === undefined) {
     return res.status(400).json({
@@ -637,6 +917,7 @@ app.post('/api/stock-count', verifyRole(['STOCK_COUNTER', 'INVENTORY_MANAGER']),
   let record = currentStockState.find(
     (item) => item.HOSPITAL_ID === hospitalId && item.MATERIAL_ID === materialId
   );
+  const previousQty = record ? record.STOCK_QTY : numericStock;
 
   if (!record) {
     record = {
@@ -660,7 +941,7 @@ app.post('/api/stock-count', verifyRole(['STOCK_COUNTER', 'INVENTORY_MANAGER']),
   const auditEntry = {
     id: `CNT-${Date.now()}`,
     timestamp: new Date().toISOString(),
-    countedBy: req.user?.name || 'Authorized Officer',
+    countedBy: req.user?.name || req.user?.full_name || 'Authorized Officer',
     email: req.user?.email || 'shopkeeper@pulsechain.com',
     hospitalId,
     city,
@@ -672,6 +953,17 @@ app.post('/api/stock-count', verifyRole(['STOCK_COUNTER', 'INVENTORY_MANAGER']),
   };
   stockCountAuditHistory.unshift(auditEntry);
   sapAdapter.logStockAudit(auditEntry);
+
+  // App-Layer Supabase Audit Log (Non-ERP history)
+  logStockAuditToSupabase({
+    userId: req.user?.id || null,
+    hospitalId,
+    materialId,
+    previousQty,
+    newQty: numericStock,
+    dailyUse: numericDaily,
+    sapCommitted: sapRecorded,
+  }).catch((err) => console.warn('[Supabase Audit] Warning logging stock audit:', err.message));
 
   let emailsTriggered = false;
 
@@ -792,12 +1084,28 @@ app.get('/api/open-shortages', (req, res) => {
 
 /**
  * POST /api/supplier-bid
- * Role: SUPPLIER or INVENTORY_MANAGER
- * Accepts { supplierId, materialId, unitCost, leadTime, capacity, compliance }
- * Calls SAP RFC Z_PULSE_SUBMIT_BID and updates in-memory supplier proposals.
+ * Role: SUPPLIER, INVENTORY_MANAGER, HOSPITAL_MANAGER, REGIONAL_ADMIN
+ * Accepts { supplierId, materialId, unitCost, leadTime, capacity, compliance, delayReason, hospitalId }
+ * Dynamically enforces OSRM route transit duration + 1 Day Rule.
+ * If leadTime > maxAllowedLeadDays, requires delayReason (min 5 characters).
+ * Calls SAP Gateway OData v2 Z_PULSE_SUBMIT_BID and updates in-memory supplier proposals.
  */
-app.post('/api/supplier-bid', verifyRole(['SUPPLIER', 'INVENTORY_MANAGER']), async (req, res) => {
-  const { supplierId, materialId, unitCost, leadTime, capacity, compliance } = req.body;
+app.post('/api/supplier-bid', verifyRole(['SUPPLIER', 'INVENTORY_MANAGER', 'HOSPITAL_MANAGER', 'REGIONAL_ADMIN']), async (req, res) => {
+  let supplierId = req.body.supplierId || req.body.supplier_id;
+  let materialId = req.body.materialId || req.body.material_id;
+  let unitCost = req.body.unitCost !== undefined ? req.body.unitCost : req.body.unit_cost;
+  let leadTime = req.body.leadTime !== undefined ? req.body.leadTime : (req.body.lead_time_days !== undefined ? req.body.lead_time_days : req.body.leadTimeDays);
+  let capacity = req.body.capacity !== undefined ? req.body.capacity : req.body.offered_qty;
+  let compliance = req.body.compliance;
+  let delayReason = req.body.delayReason || req.body.delay_reason;
+  let hospitalId = req.body.hospitalId || req.body.rfq_hospital_id || req.body.rfqHospitalId;
+
+  // Tenant scoping: Force supplierId to user's assigned supplier if SUPPLIER
+  const userRole = (req.user?.role || '').toUpperCase();
+  const userSupplier = req.user?.supplier_id || req.user?.supplierId;
+  if (userRole === 'SUPPLIER' && userSupplier) {
+    supplierId = userSupplier;
+  }
 
   if (!supplierId || !materialId || unitCost === undefined || leadTime === undefined) {
     return res.status(400).json({
@@ -811,9 +1119,40 @@ app.post('/api/supplier-bid', verifyRole(['SUPPLIER', 'INVENTORY_MANAGER']), asy
   const numericCap = capacity ? parseFloat(capacity) : 5000;
   const complianceFlag = (compliance || 'Y').toUpperCase();
 
+  // Dynamic OSRM Travel-Time & "+1 Day Rule" validation
+  const targetHospitalId = hospitalId || 'H004';
+  let routeInfo = null;
+  try {
+    routeInfo = await calculateRoute(supplierId, targetHospitalId);
+    const maxAllowedLeadDays = Math.ceil((routeInfo.durationHours || 0) / 24) + 1;
+
+    if (numericLead > maxAllowedLeadDays) {
+      if (!delayReason || typeof delayReason !== 'string' || delayReason.trim().length < 5) {
+        return res.status(400).json({
+          success: false,
+          requiresDelayReason: true,
+          leadTime: numericLead,
+          maxAllowedLeadDays,
+          route: routeInfo,
+          message: `Proposed lead time (${numericLead} days) exceeds maximum allowable transit duration (${maxAllowedLeadDays} days: transit time + 1 day buffer). A mandatory delay reason (minimum 5 characters) must be provided.`,
+        });
+      }
+    }
+  } catch (routeErr) {
+    console.warn(`[OSRM Routing] Lead time check bypass: ${routeErr.message}`);
+  }
+
   let sapRecorded = false;
   try {
-    const sapRes = await sapAdapter.submitBidToSap(supplierId, materialId, numericCost, numericLead, numericCap, complianceFlag);
+    const sapRes = await sapAdapter.submitBidToSap(
+      supplierId,
+      materialId,
+      numericCost,
+      numericLead,
+      numericCap,
+      complianceFlag,
+      delayReason || ''
+    );
     sapRecorded = sapRes.sapRecorded;
   } catch (sapErr) {
     sapRecorded = false;
@@ -823,19 +1162,31 @@ app.post('/api/supplier-bid', verifyRole(['SUPPLIER', 'INVENTORY_MANAGER']), asy
     id: `BID-${Date.now()}`,
     timestamp: new Date().toISOString(),
     supplierId,
-    supplierName: req.user?.name || `Vendor ${supplierId}`,
+    supplier_id: supplierId,
+    supplierName: req.user?.name || req.user?.full_name || `Vendor ${supplierId}`,
     materialId,
+    material_id: materialId,
+    rfq_hospital_id: targetHospitalId,
+    rfqHospitalId: targetHospitalId,
+    hospitalId: targetHospitalId,
     unitCost: numericCost,
+    unit_cost: numericCost,
     currency: 'INR',
     leadTime: numericLead,
+    lead_time_days: numericLead,
     capacity: numericCap,
+    offered_qty: numericCap,
     compliance: complianceFlag,
+    delayReason: delayReason || null,
+    delay_reason: delayReason || null,
+    osrmRoute: routeInfo ? { distanceKm: routeInfo.distanceKm, durationHours: routeInfo.durationHours, mode: routeInfo.mode } : null,
     status: complianceFlag === 'Y' ? 'ACTIVE_PROPOSAL' : 'FLAGGED_EXCURSION',
     submittedBy: req.user?.email || 'supplier@pulsechain.com',
   };
 
   supplierBids.unshift(newBid);
   sapAdapter.logSupplierBid(newBid);
+  await createSupplierBidInSupabase(newBid).catch((e) => console.warn('[Supabase Bid] Sync note:', e.message));
 
   // Update or insert into currentSuppliersState so Manager immediately sees the bid on Screen 3
   const existingSupplierIdx = currentSuppliersState.findIndex(
@@ -901,7 +1252,17 @@ app.get(['/api/supplier-bids', '/api/supplier-bids/:supplierId'], (req, res) => 
  *
  * Triggers dispatch confirmation email upon success.
  */
-app.post('/api/transfer', async (req, res) => {
+/**
+ * POST /api/transfer
+ * Phase 2 Agentic Reallocation (Write Operation)
+ * Maps Node parameters to SAP S/4HANA OData v2 InventorySet updates.
+ * Enforces Tenant Scoping:
+ * - HOSPITAL_MANAGER: only allowed to receive into their assigned hospital
+ * - SHOPKEEPER / SUPPLIER: 403 Forbidden
+ * - REGIONAL_ADMIN / System: authorized across all facilities
+ * Logs audit record to Supabase reallocation_logs table.
+ */
+app.post('/api/transfer', optionalAuth, async (req, res) => {
   const { fromHospital, toHospital, materialId, qty } = req.body;
 
   // Validate request parameters
@@ -918,6 +1279,27 @@ app.post('/api/transfer', async (req, res) => {
       success: false,
       message: 'Invalid transfer quantity. Must be a positive number.',
     });
+  }
+
+  // Tenant Enforcement:
+  // Hospital Managers may only transfer stock into their assigned hospital
+  if (req.user && !req.user.isAnonymous) {
+    const userRole = (req.user.role || '').toUpperCase();
+    const userHospital = req.user.hospital_id || req.user.hospitalId;
+
+    if (['HOSPITAL_MANAGER', 'INVENTORY_MANAGER'].includes(userRole)) {
+      if (userHospital && toHospital !== userHospital) {
+        return res.status(403).json({
+          success: false,
+          message: `Forbidden: Hospital Managers may only authorize inbound transfers to their assigned facility (${userHospital}). Target was ${toHospital}.`,
+        });
+      }
+    } else if (['SHOPKEEPER', 'STOCK_COUNTER', 'SUPPLIER'].includes(userRole)) {
+      return res.status(403).json({
+        success: false,
+        message: 'Forbidden: Insufficient permissions to authorize stock transfers.',
+      });
+    }
   }
 
   let sapSuccess = false;
@@ -965,6 +1347,18 @@ app.post('/api/transfer', async (req, res) => {
   };
   reallocationLogs.unshift(logEntry);
   sapAdapter.logReallocation(logEntry);
+
+  // App-Layer Supabase Reallocation Audit Log (Non-ERP history)
+  logReallocationToSupabase({
+    approvedBy: req.user?.id || null,
+    fromHospital,
+    toHospital,
+    materialId,
+    qty: numericQty,
+    mode: 'EMERGENCY_REALLOCATION',
+    supplierId: null,
+    sapCommitted: sapSuccess,
+  }).catch((err) => console.warn('[Supabase Reallocation Audit] Warning logging reallocation:', err.message));
 
   // Automated Dispatch Confirmation Email via Nodemailer
   const dispatchSubject = `✅ [DISPATCH CONFIRMATION] Emergency Stock Reallocation Executed: ${materialId} (#${txId})`;
@@ -1015,6 +1409,533 @@ app.get('/api/reallocations', (req, res) => {
     count: reallocationLogs.length,
     data: reallocationLogs,
   });
+});
+
+// =========================================================================
+// 8A. ORDERS & 2-STEP SHOPKEEPER GOODS APPROVALS
+// =========================================================================
+
+/**
+ * POST /api/orders/transfer
+ * Hospital Manager requests inter-hospital transfer.
+ * Does NOT move SAP stock immediately; queues in shipment_approvals (PENDING_DISPATCH)
+ */
+app.post('/api/orders/transfer', verifyRole(['HOSPITAL_MANAGER', 'INVENTORY_MANAGER', 'REGIONAL_HEAD', 'REGIONAL_ADMIN']), async (req, res) => {
+  const { fromHospital, toHospital, materialId, qty } = req.body;
+  const userRole = req.user.role;
+  const userHospital = req.user.hospital_id || req.user.hospitalId;
+
+  const destHospital = toHospital || req.body.destHospitalId || req.body.dest_hospital_id;
+  const sourceHospital = fromHospital || req.body.sourceHospitalId || req.body.source_hospital_id;
+
+  if (!destHospital || !sourceHospital || !materialId || !qty) {
+    return res.status(400).json({
+      success: false,
+      message: 'Missing required parameters: fromHospital, toHospital, materialId, qty',
+    });
+  }
+
+  // Strict Own-Hospital Scope
+  if (['HOSPITAL_MANAGER', 'INVENTORY_MANAGER'].includes(userRole) && userHospital) {
+    if (destHospital !== userHospital) {
+      return res.status(403).json({
+        success: false,
+        error: `Forbidden: Hospital Managers may only order replenishment into their assigned facility (${userHospital}). Target was ${destHospital}.`,
+      });
+    }
+  }
+
+  const numericQty = parseFloat(qty);
+  if (isNaN(numericQty) || numericQty <= 0) {
+    return res.status(400).json({ success: false, message: 'Invalid transfer quantity.' });
+  }
+
+  const shipment = await createShipmentApprovalInSupabase({
+    orderType: 'HOSPITAL_TRANSFER',
+    sourceHospitalId: sourceHospital,
+    destHospitalId: destHospital,
+    materialId,
+    qty: numericQty,
+    requestedByManagerId: req.user.id,
+    status: 'PENDING_DISPATCH',
+  });
+
+  return res.status(201).json({
+    success: true,
+    message: `Transfer order created and queued for source shopkeeper dispatch approval at ${sourceHospital}. SAP stock will move upon Shopkeeper physical handover.`,
+    shipment,
+  });
+});
+
+/**
+ * POST /api/bids/:bidId/accept
+ * Hospital Manager accepts an emergency supplier quote without moving SAP stock immediately.
+ * Validates bid.rfq_hospital_id === req.user.hospital_id and creates shipment_approvals (IN_TRANSIT).
+ */
+app.post('/api/bids/:bidId/accept', verifyRole(['HOSPITAL_MANAGER', 'INVENTORY_MANAGER', 'REGIONAL_HEAD', 'REGIONAL_ADMIN']), async (req, res) => {
+  const { bidId } = req.params;
+  const userRole = req.user.role;
+  const userHospital = req.user.hospital_id || req.user.hospitalId;
+
+  const bids = await getSupplierBidsFromSupabase();
+  const bid = bids.find((b) => b.id === bidId) || supplierBids.find((b) => b.id === bidId);
+
+  if (!bid) {
+    return res.status(404).json({ success: false, message: `Bid ${bidId} not found.` });
+  }
+
+  const rfqHospital = bid.rfq_hospital_id || bid.rfqHospitalId || bid.hospitalId || 'H004';
+
+  // Strict Own-Hospital Manager Lock
+  if (['HOSPITAL_MANAGER', 'INVENTORY_MANAGER'].includes(userRole) && userHospital) {
+    if (rfqHospital !== userHospital) {
+      return res.status(403).json({
+        success: false,
+        error: `Forbidden: You can only accept bids for your assigned hospital (${userHospital}). Bid RFQ was for ${rfqHospital}.`,
+      });
+    }
+  }
+
+  await updateSupplierBidStatusInSupabase(bidId, 'ACCEPTED');
+  if (bid.status) bid.status = 'ACCEPTED';
+
+  // Create shipment in IN_TRANSIT awaiting dest shopkeeper receipt
+  const shipment = await createShipmentApprovalInSupabase({
+    orderType: 'SUPPLIER_DELIVERY',
+    supplierId: bid.supplier_id || bid.supplierId,
+    destHospitalId: rfqHospital,
+    materialId: bid.material_id || bid.materialId,
+    qty: Number(bid.offered_qty || bid.capacity || 100),
+    bidId: bid.id,
+    requestedByManagerId: req.user.id,
+    status: 'IN_TRANSIT',
+  });
+
+  return res.status(200).json({
+    success: true,
+    message: `Supplier proposal accepted. Delivery is now IN_TRANSIT and pending Shopkeeper physical receipt verification at ${rfqHospital}.`,
+    shipment,
+  });
+});
+
+/**
+ * GET /api/shipments/pending
+ * Lists outgoing dispatches (for source shopkeepers) and incoming receipts (for dest shopkeepers)
+ */
+app.get('/api/shipments/pending', verifyRole(['SHOPKEEPER', 'STOCK_COUNTER', 'HOSPITAL_MANAGER', 'INVENTORY_MANAGER', 'REGIONAL_HEAD', 'REGIONAL_ADMIN']), async (req, res) => {
+  const userHospital = req.user.hospital_id || req.user.hospitalId || 'H004';
+  const allShipments = await getShipmentApprovalsFromSupabase();
+  const isRegional = ['REGIONAL_HEAD', 'REGIONAL_ADMIN'].includes(req.user.role);
+
+  const outgoingDispatches = allShipments.filter(
+    (s) => (isRegional || s.source_hospital_id === userHospital) && s.status === 'PENDING_DISPATCH'
+  );
+  const incomingReceipts = allShipments.filter(
+    (s) => (isRegional || s.dest_hospital_id === userHospital) && s.status === 'IN_TRANSIT'
+  );
+
+  return res.status(200).json({
+    success: true,
+    hospitalId: userHospital,
+    outgoingDispatches,
+    incomingReceipts,
+  });
+});
+
+/**
+ * POST /api/shipments/:id/approve-dispatch
+ * Step 1: Shopkeeper at source_hospital_id approves physical dispatch.
+ * Deducts stock live from SAP ZPULSE_INV and advances status to IN_TRANSIT.
+ */
+app.post('/api/shipments/:id/approve-dispatch', verifyRole(['SHOPKEEPER', 'STOCK_COUNTER', 'REGIONAL_HEAD', 'REGIONAL_ADMIN']), async (req, res) => {
+  const { id } = req.params;
+  const userHospital = req.user.hospital_id || req.user.hospitalId;
+  const isRegional = ['REGIONAL_HEAD', 'REGIONAL_ADMIN'].includes(req.user.role);
+
+  const shipments = await getShipmentApprovalsFromSupabase();
+  const shipment = shipments.find((s) => s.id === id);
+
+  if (!shipment) {
+    return res.status(404).json({ success: false, message: `Shipment ${id} not found.` });
+  }
+
+  if (shipment.status !== 'PENDING_DISPATCH') {
+    return res.status(400).json({ success: false, message: `Shipment is in '${shipment.status}', cannot approve dispatch.` });
+  }
+
+  if (!isRegional && userHospital && shipment.source_hospital_id !== userHospital) {
+    return res.status(403).json({
+      success: false,
+      error: `Forbidden: Only shopkeepers at source hospital (${shipment.source_hospital_id}) can authorize dispatch. You are at ${userHospital}.`,
+    });
+  }
+
+  let sapResult = null;
+  try {
+    sapResult = await sapAdapter.updateHospitalStockLive(shipment.source_hospital_id, shipment.material_id, -Number(shipment.qty));
+  } catch (err) {
+    console.warn('[Dispatch Live SAP Stock Error]', err.message);
+  }
+
+  const donorRecord = currentStockState.find(
+    (item) => item.HOSPITAL_ID === shipment.source_hospital_id && item.MATERIAL_ID === shipment.material_id
+  );
+  if (donorRecord) {
+    donorRecord.STOCK_QTY = Math.max(0, donorRecord.STOCK_QTY - Number(shipment.qty));
+  }
+
+  const updated = await updateShipmentApprovalInSupabase(id, {
+    status: 'IN_TRANSIT',
+    dispatch_approved_by: req.user.id,
+    dispatch_approved_at: new Date().toISOString(),
+    sap_dispatch_committed: Boolean(sapResult?.sapRecorded),
+  });
+
+  return res.status(200).json({
+    success: true,
+    message: `Physical dispatch approved. ${shipment.qty} units deducted from Hospital ${shipment.source_hospital_id} in SAP S/4HANA. Shipment is now IN_TRANSIT.`,
+    shipment: updated,
+    sapRecorded: sapResult?.sapRecorded,
+  });
+});
+
+/**
+ * POST /api/shipments/:id/approve-receipt
+ * Step 2: Shopkeeper at dest_hospital_id confirms physical delivery receipt.
+ * Adds stock live to SAP ZPULSE_INV and marks shipment DELIVERED (ready for Manager review).
+ */
+app.post('/api/shipments/:id/approve-receipt', verifyRole(['SHOPKEEPER', 'STOCK_COUNTER', 'REGIONAL_HEAD', 'REGIONAL_ADMIN']), async (req, res) => {
+  const { id } = req.params;
+  const userHospital = req.user.hospital_id || req.user.hospitalId;
+  const isRegional = ['REGIONAL_HEAD', 'REGIONAL_ADMIN'].includes(req.user.role);
+
+  const shipments = await getShipmentApprovalsFromSupabase();
+  const shipment = shipments.find((s) => s.id === id);
+
+  if (!shipment) {
+    return res.status(404).json({ success: false, message: `Shipment ${id} not found.` });
+  }
+
+  if (shipment.status !== 'IN_TRANSIT') {
+    return res.status(400).json({ success: false, message: `Shipment is in '${shipment.status}', cannot approve receipt.` });
+  }
+
+  if (!isRegional && userHospital && shipment.dest_hospital_id !== userHospital) {
+    return res.status(403).json({
+      success: false,
+      error: `Forbidden: Only shopkeepers at receiving hospital (${shipment.dest_hospital_id}) can approve receipt. You are at ${userHospital}.`,
+    });
+  }
+
+  let sapResult = null;
+  try {
+    sapResult = await sapAdapter.updateHospitalStockLive(shipment.dest_hospital_id, shipment.material_id, Number(shipment.qty));
+  } catch (err) {
+    console.warn('[Receipt Live SAP Stock Error]', err.message);
+  }
+
+  const destRecord = currentStockState.find(
+    (item) => item.HOSPITAL_ID === shipment.dest_hospital_id && item.MATERIAL_ID === shipment.material_id
+  );
+  if (destRecord) {
+    destRecord.STOCK_QTY = Number(destRecord.STOCK_QTY) + Number(shipment.qty);
+  }
+
+  if (shipment.bid_id) {
+    await updateSupplierBidStatusInSupabase(shipment.bid_id, 'DELIVERED');
+  }
+
+  const updated = await updateShipmentApprovalInSupabase(id, {
+    status: 'DELIVERED',
+    receipt_approved_by: req.user.id,
+    receipt_approved_at: new Date().toISOString(),
+    sap_receipt_committed: Boolean(sapResult?.sapRecorded),
+  });
+
+  return res.status(200).json({
+    success: true,
+    message: `Physical goods receipt verified. ${shipment.qty} units added to Hospital ${shipment.dest_hospital_id} in SAP S/4HANA. Awaiting Manager post-delivery review.`,
+    shipment: updated,
+    sapRecorded: sapResult?.sapRecorded,
+  });
+});
+
+/**
+ * POST /api/shipments/:id/reject
+ * Shopkeeper rejects PENDING_DISPATCH before any SAP stock movements occur.
+ */
+app.post('/api/shipments/:id/reject', verifyRole(['SHOPKEEPER', 'STOCK_COUNTER', 'HOSPITAL_MANAGER', 'INVENTORY_MANAGER', 'REGIONAL_HEAD', 'REGIONAL_ADMIN']), async (req, res) => {
+  const { id } = req.params;
+  const { rejection_note } = req.body;
+
+  const shipments = await getShipmentApprovalsFromSupabase();
+  const shipment = shipments.find((s) => s.id === id);
+
+  if (!shipment) {
+    return res.status(404).json({ success: false, message: `Shipment ${id} not found.` });
+  }
+
+  if (shipment.status !== 'PENDING_DISPATCH') {
+    return res.status(400).json({ success: false, message: `Only PENDING_DISPATCH shipments can be rejected before stock movement.` });
+  }
+
+  const updated = await updateShipmentApprovalInSupabase(id, {
+    status: 'REJECTED',
+    rejection_note: rejection_note || 'Rejected by physical custodian',
+  });
+
+  return res.status(200).json({
+    success: true,
+    message: 'Shipment rejected. Zero stock changes made in SAP S/4HANA.',
+    shipment: updated,
+  });
+});
+
+// =========================================================================
+// 8B. MANAGER POST-DELIVERY REVIEWS & SAP HANA RE-RANKING
+// =========================================================================
+
+/**
+ * GET /api/reviews/pending
+ * Lists DELIVERED supplier shipments for manager's hospital awaiting performance review
+ */
+app.get('/api/reviews/pending', verifyRole(['HOSPITAL_MANAGER', 'INVENTORY_MANAGER', 'REGIONAL_HEAD', 'REGIONAL_ADMIN']), async (req, res) => {
+  const userHospital = req.user.hospital_id || req.user.hospitalId || 'H004';
+  const isRegional = ['REGIONAL_HEAD', 'REGIONAL_ADMIN'].includes(req.user.role);
+
+  const allShipments = await getShipmentApprovalsFromSupabase();
+  const pendingReviews = allShipments.filter(
+    (s) =>
+      (isRegional || s.dest_hospital_id === userHospital) &&
+      s.status === 'DELIVERED' &&
+      !s.review_submitted &&
+      Boolean(s.supplier_id)
+  );
+
+  return res.status(200).json({
+    success: true,
+    hospitalId: userHospital,
+    count: pendingReviews.length,
+    shipments: pendingReviews,
+  });
+});
+
+/**
+ * POST /api/reviews
+ * Manager submits ratings (1–100) for the 8 factors.
+ * Pushes to SAP ZPULSE_SUPP via POST /SupplierSet and returns live recalculated TRUST_SCORE and SUPPLIER_TIER.
+ */
+app.post('/api/reviews', verifyRole(['HOSPITAL_MANAGER', 'INVENTORY_MANAGER', 'REGIONAL_HEAD', 'REGIONAL_ADMIN']), async (req, res) => {
+  const shipment_id = req.body.shipment_id || req.body.shipmentId;
+  const delivery_speed = req.body.delivery_speed !== undefined ? req.body.delivery_speed : req.body.deliverySpeed;
+  const on_time_rate = req.body.on_time_rate !== undefined ? req.body.on_time_rate : req.body.onTimeRate;
+  const reliability = req.body.reliability !== undefined ? req.body.reliability : req.body.reliability;
+  const quality_score = req.body.quality_score !== undefined ? req.body.quality_score : req.body.qualityScore;
+  const emerg_response = req.body.emerg_response !== undefined ? req.body.emerg_response : req.body.emergResponse;
+  const cold_chain_score = req.body.cold_chain_score !== undefined ? req.body.cold_chain_score : req.body.coldChainScore;
+  const fulfilment_rate = req.body.fulfilment_rate !== undefined ? req.body.fulfilment_rate : req.body.fulfilmentRate;
+  const doc_cert_score = req.body.doc_cert_score !== undefined ? req.body.doc_cert_score : req.body.docCertScore;
+  const comments = req.body.comments;
+
+  const userHospital = req.user.hospital_id || req.user.hospitalId;
+  const isRegional = ['REGIONAL_HEAD', 'REGIONAL_ADMIN'].includes(req.user.role);
+
+  if (!shipment_id) {
+    return res.status(400).json({ success: false, message: 'shipment_id is required.' });
+  }
+
+  const shipments = await getShipmentApprovalsFromSupabase();
+  const shipment = shipments.find((s) => s.id === shipment_id);
+
+  if (!shipment) {
+    return res.status(404).json({ success: false, message: `Shipment ${shipment_id} not found.` });
+  }
+
+  // Strict Hospital Manager Scope
+  if (!isRegional && userHospital && shipment.dest_hospital_id !== userHospital) {
+    return res.status(403).json({
+      success: false,
+      error: `Forbidden: Managers may only submit reviews for shipments delivered to their hospital (${userHospital}). Target was ${shipment.dest_hospital_id}.`,
+    });
+  }
+
+  // Validate 8 ratings (1-100)
+  const factorMap = {
+    delivery_speed,
+    on_time_rate,
+    reliability,
+    quality_score,
+    emerg_response,
+    cold_chain_score,
+    fulfilment_rate,
+    doc_cert_score,
+  };
+
+  for (const [k, v] of Object.entries(factorMap)) {
+    const val = Number(v);
+    if (isNaN(val) || val < 1 || val > 100) {
+      return res.status(400).json({
+        success: false,
+        message: `Invalid rating for '${k}'. Must be an integer between 1 and 100. Received: ${v}`,
+      });
+    }
+  }
+
+  const ratings = {
+    deliverySpeed: Number(delivery_speed),
+    onTimeRate: Number(on_time_rate),
+    reliability: Number(reliability),
+    qualityScore: Number(quality_score),
+    emergResponse: Number(emerg_response),
+    coldChainScore: Number(cold_chain_score),
+    fulfilmentRate: Number(fulfilment_rate),
+    docCertScore: Number(doc_cert_score),
+  };
+
+  const sapResult = await sapAdapter.updateSupplierMetricsInSap(
+    shipment.supplier_id,
+    shipment.material_id,
+    ratings,
+    comments || ''
+  );
+
+  const review = await createSupplierReviewInSupabase({
+    shipmentId: shipment.id,
+    supplierId: shipment.supplier_id,
+    materialId: shipment.material_id,
+    hospitalId: shipment.dest_hospital_id,
+    reviewedByManagerId: req.user.id,
+    ratings,
+    comments: comments || '',
+    syncedToSap: Boolean(sapResult.sapRecorded),
+  });
+
+  await updateShipmentApprovalInSupabase(shipment.id, { review_submitted: true });
+
+  return res.status(201).json({
+    success: true,
+    message: 'Post-delivery review recorded and synchronized to SAP S/4HANA Supplier Ledger.',
+    review,
+    trustScore: sapResult.trustScore,
+    supplierTier: sapResult.supplierTier,
+    isEligible: sapResult.isEligible,
+    factors: sapResult.factors,
+    sapRecorded: sapResult.sapRecorded,
+  });
+});
+
+// =========================================================================
+// 8C. REGIONAL HEAD STAFF DIRECTORY & HOSPITAL TASKS
+// =========================================================================
+
+/**
+ * GET /api/regional/users
+ * Returns live staff directory from SAP UserSet merged with Supabase sync status
+ */
+app.get('/api/regional/users', verifyRole(['REGIONAL_HEAD', 'REGIONAL_ADMIN']), async (req, res) => {
+  const sapUsersResult = await sapAdapter.getSapUsers();
+  const sapUsers = sapUsersResult.users || [];
+
+  let supabaseProfiles = [];
+  if (supabaseAdmin) {
+    try {
+      const { data } = await supabaseAdmin.from('user_profiles').select('*');
+      if (Array.isArray(data)) supabaseProfiles = data;
+    } catch (e) {}
+  }
+
+  const merged = sapUsers.map((u) => {
+    const prof = supabaseProfiles.find((p) => p.email?.toLowerCase() === u.Email?.toLowerCase());
+    return {
+      userId: u.UserId,
+      email: u.Email,
+      fullName: u.FullName,
+      role: u.Role,
+      hospitalId: u.HospitalId || null,
+      supplierId: u.SupplierId || null,
+      city: u.City,
+      region: u.Region,
+      warehouseBay: u.WarehouseBay,
+      canApprove: u.CanApprove === 'Y',
+      status: u.Status,
+      sapSynced: true,
+      supabaseUserId: prof?.id || null,
+    };
+  });
+
+  return res.status(200).json({
+    success: true,
+    source: sapUsersResult.isLive ? 'LIVE_SAP_USERSET' : 'OFFLINE_CACHE',
+    count: merged.length,
+    users: merged,
+  });
+});
+
+/**
+ * POST /api/tasks & GET /api/tasks
+ * Own-Hospital Task Plans
+ */
+app.post('/api/tasks', verifyRole(['HOSPITAL_MANAGER', 'INVENTORY_MANAGER', 'REGIONAL_HEAD', 'REGIONAL_ADMIN']), async (req, res) => {
+  const { hospital_id, material_id, title, description, priority, due_date } = req.body;
+  const userRole = req.user.role;
+  const userHospital = req.user.hospital_id || req.user.hospitalId;
+
+  if (['HOSPITAL_MANAGER', 'INVENTORY_MANAGER'].includes(userRole) && userHospital) {
+    if (hospital_id && hospital_id !== userHospital) {
+      return res.status(403).json({
+        success: false,
+        error: `Forbidden: Cannot create tasks for other hospitals. You are assigned to ${userHospital}.`,
+      });
+    }
+  }
+
+  const targetHospital = hospital_id || userHospital || 'H004';
+  if (!title) {
+    return res.status(400).json({ success: false, message: 'Task title is required.' });
+  }
+
+  const task = await createHospitalTaskInSupabase({
+    hospitalId: targetHospital,
+    materialId: material_id,
+    title,
+    description,
+    priority,
+    status: 'PENDING',
+    assignedTo: null,
+    createdBy: req.user.id,
+    dueDate: due_date,
+  });
+
+  return res.status(201).json({ success: true, task });
+});
+
+app.get(['/api/tasks', '/api/tasks/:hospitalId'], optionalAuth, async (req, res) => {
+  const hospitalId = req.params.hospitalId || req.user?.hospital_id || req.user?.hospitalId;
+  const tasks = await getHospitalTasksFromSupabase(hospitalId);
+  return res.status(200).json({ success: true, tasks });
+});
+
+/**
+ * GET /api/bids
+ * Multi-tenant Scoped Bids:
+ * - SUPPLIER sees only their own bids
+ * - HOSPITAL_MANAGER sees bids for their hospital
+ * - REGIONAL_HEAD sees all
+ */
+app.get('/api/bids', optionalAuth, async (req, res) => {
+  const userRole = (req.user?.role || '').toUpperCase();
+  const userSupplier = req.user?.supplier_id || req.user?.supplierId;
+  const userHospital = req.user?.hospital_id || req.user?.hospitalId;
+
+  let filter = {};
+  if (userRole === 'SUPPLIER' && userSupplier) {
+    filter.supplierId = userSupplier;
+  } else if (['HOSPITAL_MANAGER', 'INVENTORY_MANAGER'].includes(userRole) && userHospital) {
+    filter.rfqHospitalId = userHospital;
+  }
+
+  const bids = await getSupplierBidsFromSupabase(filter);
+  return res.status(200).json({ success: true, count: bids.length, data: bids });
 });
 
 /**
@@ -1085,14 +2006,14 @@ function extractJson(text) {
     if (jsonMatch) {
       try {
         return JSON.parse(jsonMatch[1]);
-      } catch (e2) {}
+      } catch (e2) { }
     }
     const firstBrace = text.indexOf('{');
     const lastBrace = text.lastIndexOf('}');
     if (firstBrace !== -1 && lastBrace !== -1) {
       try {
         return JSON.parse(text.slice(firstBrace, lastBrace + 1));
-      } catch (e3) {}
+      } catch (e3) { }
     }
     return null;
   }
@@ -1129,9 +2050,21 @@ async function fetchSapSuppliersData() {
 /**
  * GET /api/suppliers
  * External supplier capacity, lead times, and compliance status
+ * If caller is a SUPPLIER, only returns their own supplier_id to protect vendor pricing privacy.
+ * Regional Admins and Hospital Managers can view all suppliers.
  */
-app.get('/api/suppliers', async (req, res) => {
-  const data = await fetchSapSuppliersData();
+app.get('/api/suppliers', optionalAuth, async (req, res) => {
+  let data = await fetchSapSuppliersData();
+
+  if (req.user && !req.user.isAnonymous) {
+    const userRole = (req.user.role || '').toUpperCase();
+    const userSupplierId = req.user.supplier_id || req.user.supplierId;
+
+    if (userRole === 'SUPPLIER' && userSupplierId) {
+      data = data.filter((s) => s.SUPPLIER_ID === userSupplierId);
+    }
+  }
+
   return res.status(200).json({
     success: true,
     data,
@@ -1139,25 +2072,94 @@ app.get('/api/suppliers', async (req, res) => {
 });
 
 /**
+ * GET /api/route/:originId/:destId
+ * Live OSRM Road Distance, Travel Duration & Max Allowed Lead Days
+ */
+app.get('/api/route/:originId/:destId', async (req, res) => {
+  try {
+    const { originId, destId } = req.params;
+    const route = await calculateRoute(originId, destId);
+    return res.status(200).json({
+      success: true,
+      route,
+    });
+  } catch (err) {
+    return res.status(500).json({
+      success: false,
+      message: err.message,
+    });
+  }
+});
+
+/**
+ * GET /api/external-risk/:hospitalId
+ * External real-time risk intelligence (Open-Meteo weather + GDELT news disruption sensing)
+ */
+app.get('/api/external-risk/:hospitalId', async (req, res) => {
+  try {
+    const { hospitalId } = req.params;
+    const risk = await getExternalRisk(hospitalId);
+    return res.status(200).json({
+      success: true,
+      hospitalId,
+      risk,
+    });
+  } catch (err) {
+    return res.status(500).json({
+      success: false,
+      message: err.message,
+    });
+  }
+});
+
+/**
+ * GET /api/recommend-suppliers/:hospitalId/:materialId
+ * Multi-factor supplier ranking combining SAP S/4HANA TrustScore/Tier with OSRM transit & weather risk
+ */
+app.get('/api/recommend-suppliers/:hospitalId/:materialId', async (req, res) => {
+  try {
+    const { hospitalId, materialId } = req.params;
+    const result = await recommendSuppliers(hospitalId, materialId);
+    return res.status(200).json({
+      success: true,
+      ...result,
+    });
+  } catch (err) {
+    return res.status(500).json({
+      success: false,
+      message: err.message,
+    });
+  }
+});
+
+/**
  * Calls Gemini with fallback across supported models
  */
 async function callGemini(contents) {
   if (!aiClient) return null;
-  const primaryModel = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
-  try {
-    const res = await aiClient.models.generateContent({
-      model: primaryModel,
-      contents,
-      config: {
-        responseMimeType: 'application/json',
-      },
-    });
-    const text = res?.text || res?.candidates?.[0]?.content?.parts?.[0]?.text;
-    if (text) return { text, model: primaryModel };
-  } catch (err) {
-    console.warn(`[Gemini GenAI] API call to ${primaryModel} failed (${err.message}). Engaging deterministic fallback.`);
-    return null;
+  const modelsToTry = [
+    process.env.GEMINI_MODEL,
+    'gemini-2.5-flash',
+    'gemini-2.0-flash',
+    'gemini-1.5-flash',
+  ].filter(Boolean);
+
+  for (const model of modelsToTry) {
+    try {
+      const res = await aiClient.models.generateContent({
+        model,
+        contents,
+        config: {
+          responseMimeType: 'application/json',
+        },
+      });
+      const text = res?.text || res?.candidates?.[0]?.content?.parts?.[0]?.text;
+      if (text) return { text, model };
+    } catch (err) {
+      // Continue to next candidate model
+    }
   }
+  console.log('[Gemini GenAI] External AI model unavailable. Operating in deterministic disruption mode.');
   return null;
 }
 
@@ -1408,8 +2410,8 @@ Instructions:
         const reasoning = !supplierIsCompliant
           ? `Supplier ${matchedSupplier.SUPPLIER_ID} was REJECTED due to cold-chain violation. Selected Option A (Same-City Hub H005) for instant zero-lead-time recovery.`
           : `Selected Option A (Internal Transfer from Hub H005): Same-city proximity ensures 0-day lead time while saving $${(
-              optionB.totalCost - optionA.totalCost
-            ).toLocaleString()} in commercial fees.`;
+            optionB.totalCost - optionA.totalCost
+          ).toLocaleString()} in commercial fees.`;
 
         return {
           hospitalId: shortage.hospitalId,
@@ -1473,30 +2475,48 @@ Instructions:
   }
 });
 
+// =========================================================================
+// SERVE FRONTEND DIST & SINGLE PAGE APPLICATION (SPA) ROUTING
+// =========================================================================
+const frontendDistPath = path.join(__dirname, '../frontend/dist');
+app.use(express.static(frontendDistPath));
+
+// Catch-all handler to serve index.html for client-side routing (compatible with Express 5 & 4)
+app.use((req, res) => {
+  if (req.path.startsWith('/api')) {
+    return res.status(404).json({ error: 'Endpoint not found' });
+  }
+  const indexPath = path.join(frontendDistPath, 'index.html');
+  if (fs.existsSync(indexPath)) {
+    return res.sendFile(indexPath);
+  }
+  return res.status(200).send('PulseChain API Server is active. Frontend build in progress.');
+});
+
 // Start Server with clean console output and robust port error handling
 const server = app.listen(PORT, async () => {
   try {
     await fetchSapInventoryData();
-  } catch (e) {}
+  } catch (e) { }
   console.log(`=======================================================`);
-  console.log(`🏥 PulseChain Enterprise Supply Chain API on port ${PORT}`);
-  console.log(`🔐 POST http://localhost:${PORT}/api/auth/login (JWT RBAC)`);
-  console.log(`📡 GET  http://localhost:${PORT}/api/inventory`);
-  console.log(`📍 GET  http://localhost:${PORT}/api/inventory/same-city/:hospitalId`);
-  console.log(`📋 POST http://localhost:${PORT}/api/stock-count (Shopkeeper & Dual Email)`);
-  console.log(`⚡ POST http://localhost:${PORT}/api/supplier-bid (Live Supplier Portal)`);
-  console.log(`📢 GET  http://localhost:${PORT}/api/open-shortages (Public RFQs)`);
-  console.log(`🚚 POST http://localhost:${PORT}/api/transfer (Agentic Reallocation + Dispatch Email)`);
-  console.log(`ℹ️  GET  http://localhost:${PORT}/api/status`);
+  console.log(` PulseChain Enterprise Supply Chain API on port ${PORT}`);
+  console.log(` POST http://localhost:${PORT}/api/auth/login (JWT RBAC)`);
+  console.log(` GET  http://localhost:${PORT}/api/inventory`);
+  console.log(` GET  http://localhost:${PORT}/api/inventory/same-city/:hospitalId`);
+  console.log(` POST http://localhost:${PORT}/api/stock-count (Shopkeeper & Dual Email)`);
+  console.log(` POST http://localhost:${PORT}/api/supplier-bid (Live Supplier Portal)`);
+  console.log(` GET  http://localhost:${PORT}/api/open-shortages (Public RFQs)`);
+  console.log(` POST http://localhost:${PORT}/api/transfer (Agentic Reallocation + Dispatch Email)`);
+  console.log(` GET  http://localhost:${PORT}/api/status`);
   console.log(`=======================================================`);
 });
 
 server.on('error', (err) => {
   if (err.code === 'EADDRINUSE') {
-    console.error(`⚠️ Port ${PORT} is already in use by another running instance.`);
+    console.error(` Port ${PORT} is already in use by another running instance.`);
     console.error(`   To free port ${PORT}, run in PowerShell:`);
     console.error(`   Stop-Process -Id (Get-NetTCPConnection -LocalPort ${PORT}).OwningProcess -Force`);
   } else {
-    console.error(`⚠️ Server error:`, err.message);
+    console.error(` Server error:`, err.message);
   }
 });

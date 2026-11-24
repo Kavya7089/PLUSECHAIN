@@ -8,10 +8,9 @@ import {
   Database,
   LayoutDashboard,
   Radio,
-  Server,
   ShieldCheck,
   Truck,
-  Zap,
+  Users,
 } from 'lucide-react';
 
 export default function Sidebar({
@@ -28,7 +27,6 @@ export default function Sidebar({
       subtitle: 'Overview & Disruption Radar',
       icon: LayoutDashboard,
       badge: 'Radar',
-      badgeColor: 'bg-[#2a3f3f] text-[#89c07e] border-[#89c07e]/30',
     },
     {
       id: 2,
@@ -36,7 +34,7 @@ export default function Sidebar({
       subtitle: 'Shortages (< 12d Cover)',
       icon: AlertOctagon,
       badge: criticalCount > 0 ? `${criticalCount} At Risk` : 'Stable',
-      badgeColor: criticalCount > 0 ? 'bg-[#f0cd6e] text-[#2c2e35] font-bold' : 'bg-[#2a3f3f] text-[#89c07e]',
+      isCritical: criticalCount > 0,
     },
     {
       id: 3,
@@ -44,7 +42,6 @@ export default function Sidebar({
       subtitle: 'Transfer vs. Purchase',
       icon: BrainCircuit,
       badge: selectedPlan ? selectedPlan.type : 'AI Engine',
-      badgeColor: 'bg-[#2a3f3f] text-[#f0cd6e] border-[#f0cd6e]/30',
     },
     {
       id: 4,
@@ -52,7 +49,6 @@ export default function Sidebar({
       subtitle: 'Cold-Chain Validation',
       icon: ShieldCheck,
       badge: isCompliancePassed ? 'Verified' : 'Pending',
-      badgeColor: isCompliancePassed ? 'bg-[#467750] text-[#e0e8e2]' : 'bg-[#2a3f3f] text-[#e0e8e2]/60',
     },
     {
       id: 5,
@@ -60,7 +56,6 @@ export default function Sidebar({
       subtitle: 'SAP ERP Execution',
       icon: CheckSquare,
       badge: 'Authorize',
-      badgeColor: 'bg-[#f0cd6e]/20 text-[#f0cd6e] border-[#f0cd6e]/40 font-bold',
     },
     {
       id: 6,
@@ -68,46 +63,53 @@ export default function Sidebar({
       subtitle: 'Rates & Transfer Duration',
       icon: Truck,
       badge: 'Vendors',
-      badgeColor: 'bg-[#2a3f3f] text-[#89c07e] border-[#89c07e]/40 font-semibold',
+    },
+    {
+      id: 7,
+      title: '7. Staff Directory',
+      subtitle: 'SAP UserSet & Roster',
+      icon: Users,
+      badge: 'UserSet',
     },
   ];
 
   return (
-    <aside className="w-72 shrink-0 glass-panel border-r border-[#e0e8e2]/10 bg-[#2c2e35]/80 backdrop-blur-2xl flex flex-col h-screen sticky top-0 z-30 transition-all">
-      {/* Brand & Identity with Official PulseChain Logo */}
-      <div className="p-2  border-b border-[#e0e8e2]/10 flex items-center space-x-3.5">
-        <div className="relative flex items-center justify-center w-12 h-12 rounded-2xl">
+    <aside className="w-72 shrink-0 border-r border-sand-border bg-abyss-card/85 backdrop-blur-xl flex flex-col h-screen sticky top-0 z-30 transition-colors print:hidden shadow-xl">
+      {/* Brand & Identity */}
+      <div className="p-4 border-b border-sand-border flex items-center space-x-3">
+        <div className="relative flex items-center justify-center w-10 h-10 rounded-xl bg-abyss-elevated border border-sand-border overflow-hidden p-1 shadow-xs">
           <img
             src="/pulsechain-logo.png"
-            alt="PulseChain Logo"
+            alt="PulseChain Control Tower Emblem"
+            width="32"
+            height="32"
             className="w-full h-full object-contain"
           />
         </div>
         <div className="min-w-0">
           <div className="flex items-center space-x-1.5">
-            <h1 className="text-lg font-black tracking-tight text-[#e0e8e2]">PulseChain</h1>
-            
+            <span className="text-base font-bold tracking-tight text-abyss-text">PulseChain</span>
           </div>
-          <p className="text-[11px] text-[#e0e8e2]/60 font-mono tracking-tight truncate">
-            Autonomous Supply Tower
+          <p className="text-[11px] text-abyss-muted font-mono tracking-tight truncate">
+            Control Tower v3.2
           </p>
         </div>
       </div>
 
-      {/* Disruption Alert Beacon */}
-      <div className="mx-4 my-4 p-3 rounded-2xl bg-[#f0cd6e]/10 border border-[#f0cd6e]/30 flex items-center justify-between">
+      {/* Disruption Alert Status Banner */}
+      <div className="mx-3 my-3 p-3 rounded-xl bg-abyss-elevated border border-sand-border flex items-center justify-between text-xs">
         <div className="flex items-center space-x-2">
-          <Radio className="w-4 h-4 text-[#f0cd6e] animate-pulse" />
-          <div>
-            <div className="text-[11px] font-bold text-[#f0cd6e] tracking-tight">Active Disruption</div>
-            <div className="text-[10px] text-[#e0e8e2]/70">Port of Rotterdam: +12d Lead Time</div>
+          <Radio className="w-4 h-4 text-volt shrink-0 animate-pulse" />
+          <div className="min-w-0">
+            <div className="text-[11px] font-bold text-abyss-text">Active Disruption</div>
+            <div className="text-[10px] text-abyss-muted truncate">Port of Rotterdam: +12d Lead Time</div>
           </div>
         </div>
       </div>
 
       {/* 5-Screen Workflow Navigation List */}
-      <nav className="flex-1 px-4 space-y-1.5 overflow-y-auto">
-        <div className="text-[10px] uppercase font-bold text-[#e0e8e2]/40 tracking-wider px-3 mb-2">
+      <nav className="flex-1 px-3 space-y-1 overflow-y-auto">
+        <div className="text-[10px] uppercase font-bold text-abyss-muted tracking-wider px-2 py-1.5">
           Resilience Workflow Pipeline
         </div>
         {navItems.map((item) => {
@@ -117,48 +119,53 @@ export default function Sidebar({
           return (
             <button
               key={item.id}
+              type="button"
               onClick={() => setActiveScreen(item.id)}
-              className={`w-full text-left p-3 rounded-2xl flex items-center justify-between transition-all duration-200 group ${
+              className={`w-full text-left p-2.5 rounded-xl flex items-center justify-between transition-colors group focus-visible:ring-2 focus-visible:ring-[#FFD400] ${
                 isActive
-                  ? 'bg-gradient-to-r from-[#467750]/70 to-[#2a3f3f]/90 border border-[#89c07e]/40 shadow-lg glow-mint'
-                  : 'hover:bg-[#2a3f3f]/40 border border-transparent text-[#e0e8e2]/70 hover:text-white'
+                  ? 'bg-volt text-volt-text font-bold shadow-sm'
+                  : 'text-abyss-text hover:bg-abyss-elevated'
               }`}
             >
-              <div className="flex items-center space-x-3">
+              <div className="flex items-center space-x-2.5 min-w-0">
                 <div
-                  className={`w-8 h-8 rounded-xl flex items-center justify-center transition-all ${
+                  className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 transition-colors ${
                     isActive
-                      ? 'bg-[#f0cd6e] text-[#2c2e35] shadow-md font-bold'
-                      : 'bg-[#2a3f3f]/70 text-[#89c07e] border border-[#e0e8e2]/10 group-hover:border-[#89c07e]/30'
+                      ? 'bg-[#081F20] text-volt'
+                      : 'bg-abyss-elevated text-abyss-muted border border-sand-border group-hover:text-abyss-text'
                   }`}
                 >
-                  <Icon className="w-4 h-4" />
+                  <Icon className="w-3.5 h-3.5" />
                 </div>
-                <div>
-                  <div className="flex items-center space-x-1.5">
-                    <span
-                      className={`text-xs font-bold tracking-tight ${
-                        isActive ? 'text-white font-extrabold' : 'text-[#e0e8e2]'
-                      }`}
-                    >
-                      {item.title}
-                    </span>
+                <div className="min-w-0">
+                  <div className="text-xs font-semibold truncate">
+                    {item.title}
                   </div>
-                  <div className="text-[10px] text-[#e0e8e2]/60 truncate max-w-[130px]">
+                  <div
+                    className={`text-[10px] truncate ${
+                      isActive ? 'text-volt-text/80' : 'text-abyss-muted'
+                    }`}
+                  >
                     {item.subtitle}
                   </div>
                 </div>
               </div>
 
-              <div className="flex items-center space-x-1.5">
+              <div className="flex items-center space-x-1 shrink-0 ml-1">
                 <span
-                  className={`text-[10px] font-mono px-2 py-0.5 rounded-full border ${item.badgeColor}`}
+                  className={`text-[9px] font-mono px-1.5 py-0.5 rounded border ${
+                    isActive
+                      ? 'bg-[#081F20] text-volt border-transparent font-bold'
+                      : item.isCritical
+                      ? 'bg-volt/15 text-volt border-volt/40 font-bold'
+                      : 'bg-abyss-elevated text-abyss-muted border-sand-border'
+                  }`}
                 >
                   {item.badge}
                 </span>
                 <ChevronRight
                   className={`w-3.5 h-3.5 transition-transform ${
-                    isActive ? 'text-[#f0cd6e] translate-x-0.5' : 'text-slate-600 opacity-0 group-hover:opacity-100'
+                    isActive ? 'text-volt-text translate-x-0.5' : 'text-abyss-muted opacity-0 group-hover:opacity-100'
                   }`}
                 />
               </div>
@@ -168,22 +175,22 @@ export default function Sidebar({
       </nav>
 
       {/* SAP ERP Connection Footer Status */}
-      <div className="p-4 mx-4 mb-4 rounded-2xl bg-[#2a3f3f]/50 border border-[#e0e8e2]/10 text-xs">
-        <div className="flex items-center justify-between mb-1.5">
-          <span className="text-[10px] font-semibold uppercase tracking-wider text-[#e0e8e2]/60">
+      <div className="p-3 mx-3 mb-3 rounded-xl bg-abyss-elevated border border-sand-border text-xs">
+        <div className="flex items-center justify-between mb-1">
+          <span className="text-[10px] font-semibold uppercase tracking-wider text-abyss-muted">
             SAP S/4HANA Connection
           </span>
           <span className="flex h-2 w-2 relative">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#89c07e] opacity-75"></span>
-            <span className="relative inline-flex rounded-full h-2 w-2 bg-[#89c07e]"></span>
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-volt opacity-75"></span>
+            <span className="relative inline-flex rounded-full h-2 w-2 bg-volt"></span>
           </span>
         </div>
-        <div className="flex items-center space-x-2 text-[11px] font-mono text-[#89c07e]">
-          <Database className="w-3.5 h-3.5 text-[#89c07e]" />
-          <span>Connected: S4H_CL100</span>
+        <div className="flex items-center space-x-1.5 text-[11px] font-mono text-abyss-text">
+          <Database className="w-3.5 h-3.5 text-volt" />
+          <span>Connected: ZPLUSE_SRV</span>
         </div>
-        <div className="text-[10px] text-[#e0e8e2]/50 font-mono mt-0.5">
-          RFC: Z_PULSE_GET_STOCK
+        <div className="text-[10px] text-abyss-muted font-mono mt-0.5">
+          Client: 105 • OData v2 Live
         </div>
       </div>
     </aside>

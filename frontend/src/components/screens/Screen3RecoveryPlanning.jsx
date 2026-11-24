@@ -1,28 +1,28 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import axios from 'axios';
 import { usePulseChain } from '../../context/PulseChainContext';
+import DeliveryRouteMap from '../DeliveryRouteMap';
+import CopyButton from '../common/CopyButton';
+import ConfirmModal from '../common/ConfirmModal';
 import {
-  AlertTriangle,
-  ArrowRight,
   BrainCircuit,
   Building2,
   CheckCircle2,
   Clock,
-  Compass,
   Cpu,
   DollarSign,
-  Layers,
   Package,
   ShieldAlert,
   ShieldCheck,
-  Sparkles,
   Truck,
-  Zap,
   MapPin,
-  Tag,
+  Crown,
+  Navigation,
+  ArrowRight,
+  AlertTriangle,
 } from 'lucide-react';
 
-const API_BASE_URL = 'http://localhost:5000/api';
+const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000') + '/api';
 
 export default function Screen3RecoveryPlanning({
   selectedShortage,
@@ -33,8 +33,14 @@ export default function Screen3RecoveryPlanning({
   const { supplierBids, fetchSupplierBids } = usePulseChain();
   const [suppliers, setSuppliers] = useState([]);
   const [loadingSuppliers, setLoadingSuppliers] = useState(true);
+  const [recommendationData, setRecommendationData] = useState(null);
+  const [loadingRecs, setLoadingRecs] = useState(false);
 
-  // Target hospital and medicine in distress (default to H004 in Bhopal or selected)
+  // Modal confirmation for direct bid acceptance
+  const [confirmBidModalOpen, setConfirmBidModalOpen] = useState(false);
+  const [pendingBidToAccept, setPendingBidToAccept] = useState(null);
+
+  // Target hospital and medicine in distress
   const target = selectedShortage || {
     HOSPITAL_ID: 'H004',
     HOSPITAL_NAME: 'Bhopal Apex Care Hospital',
@@ -55,7 +61,7 @@ export default function Screen3RecoveryPlanning({
       setLoadingSuppliers(true);
       try {
         const response = await axios.get(`${API_BASE_URL}/suppliers`);
-        setSuppliers(response.data.data || []);
+        setSuppliers(response.data?.data || []);
       } catch (err) {
         console.error('Failed to load suppliers:', err);
       } finally {
@@ -66,7 +72,27 @@ export default function Screen3RecoveryPlanning({
     if (fetchSupplierBids) fetchSupplierBids();
   }, [fetchSupplierBids]);
 
-  // Check if any live bids were submitted via the Supplier Portal for this material
+  // Fetch /api/recommend-suppliers/:hospitalId/:materialId
+  useEffect(() => {
+    const fetchRecommendations = async () => {
+      setLoadingRecs(true);
+      try {
+        const hId = target.HOSPITAL_ID || 'H004';
+        const mId = target.MATERIAL_ID || 'AMX002';
+        const res = await axios.get(`${API_BASE_URL}/recommend-suppliers/${hId}/${mId}`);
+        if (res.data?.success) {
+          setRecommendationData(res.data);
+        }
+      } catch (err) {
+        console.warn('Failed to load supplier recommendations:', err.message);
+      } finally {
+        setLoadingRecs(false);
+      }
+    };
+    fetchRecommendations();
+  }, [target.HOSPITAL_ID, target.MATERIAL_ID]);
+
+  // Live bids for this material
   const liveBidsForMaterial = useMemo(() => {
     return (supplierBids || []).filter((b) => b.materialId === target.MATERIAL_ID);
   }, [supplierBids, target.MATERIAL_ID]);
@@ -74,7 +100,36 @@ export default function Screen3RecoveryPlanning({
   // Active supplier selection state for Option B
   const [selectedBidId, setSelectedBidId] = useState(null);
 
-  // Find supplier for this material or default to V1001
+  // Direct Accept Bid & Order handler
+  const [acceptingBid, setAcceptingBid] = useState(false);
+  const [orderDirectResult, setOrderDirectResult] = useState(null);
+
+  const handleAcceptBidDirect = async (bidId) => {
+    if (!bidId) return;
+    setAcceptingBid(true);
+    setOrderDirectResult(null);
+    try {
+      const res = await axios.post(`${API_BASE_URL}/bids/${bidId}/accept`);
+      if (res.data?.success) {
+        setOrderDirectResult({
+          type: 'success',
+          message: `Bid accepted! Order created (${res.data.shipment?.id || 'PO-COMMITTED'}). Sent to destination hospital for Shopkeeper receipt approval.`,
+          shipment: res.data.shipment,
+        });
+        if (fetchSupplierBids) fetchSupplierBids();
+      }
+    } catch (err) {
+      setOrderDirectResult({
+        type: 'error',
+        message: err.response?.data?.message || err.response?.data?.error || 'Failed to accept bid.',
+      });
+    } finally {
+      setAcceptingBid(false);
+      setConfirmBidModalOpen(false);
+    }
+  };
+
+  // Safe matching supplier resolution with strict fallbacks
   const matchingSupplier = useMemo(() => {
     if (selectedBidId) {
       const bid = liveBidsForMaterial.find((b) => b.id === selectedBidId);
@@ -83,30 +138,42 @@ export default function Screen3RecoveryPlanning({
           SUPPLIER_ID: bid.supplierId,
           SUPPLIER_NAME: bid.supplierName || `Vendor ${bid.supplierId}`,
           MATERIAL_ID: bid.materialId,
-          LEAD_TIME: bid.leadTime,
-          CAPACITY: bid.capacity,
-          UNIT_COST: bid.unitCost,
-          COMPLIANCE: bid.compliance,
+          LEAD_TIME: bid.leadTime || 2,
+          CAPACITY: bid.capacity || 5000,
+          UNIT_COST: bid.unitCost || 150,
+          COMPLIANCE: bid.compliance || 'Y',
           LOCATION: 'Supplier Bidding Portal Quote',
           isLiveBid: true,
         };
       }
     }
 
-    return (
+    const matched =
       suppliers.find((s) => s.MATERIAL_ID === target.MATERIAL_ID) ||
-      suppliers.find((s) => s.SUPPLIER_ID === 'V1001') || {
-        SUPPLIER_ID: 'V1001',
-        SUPPLIER_NAME: 'BioPharm Global Logistics',
-        MATERIAL_ID: target.MATERIAL_ID,
-        LEAD_TIME: 2,
-        CAPACITY: 5000,
-        UNIT_COST: 150,
-        COMPLIANCE: 'Y',
-        LOCATION: 'Frankfurt Central Hub',
+      suppliers.find((s) => s.SUPPLIER_ID === 'V1001');
+
+    if (matched) {
+      return {
+        ...matched,
+        LEAD_TIME: matched.LEAD_TIME || 2,
+        UNIT_COST: matched.UNIT_COST || 150,
+        COMPLIANCE: matched.COMPLIANCE || 'Y',
+        SUPPLIER_NAME: matched.SUPPLIER_NAME || `Vendor ${matched.SUPPLIER_ID}`,
         isLiveBid: false,
-      }
-    );
+      };
+    }
+
+    return {
+      SUPPLIER_ID: 'V1001',
+      SUPPLIER_NAME: 'BioCare Logistics India',
+      MATERIAL_ID: target.MATERIAL_ID || 'AMX002',
+      LEAD_TIME: 2,
+      CAPACITY: 5000,
+      UNIT_COST: 150,
+      COMPLIANCE: 'Y',
+      LOCATION: 'Bhopal Freight Depot',
+      isLiveBid: false,
+    };
   }, [suppliers, target.MATERIAL_ID, selectedBidId, liveBidsForMaterial]);
 
   // Option A Data Structure (Internal Transfer - Geo-Fenced to Same City)
@@ -165,34 +232,36 @@ export default function Screen3RecoveryPlanning({
   const currentPlan = selectedPlan || optionA;
 
   return (
-    <div className="space-y-4 animate-in fade-in duration-300">
-      {/* Compact Header Banner */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 p-4 rounded-2xl glass-panel border border-[#e0e8e2]/15 bg-[#2c2e35]/70">
-        <div>
-          <div className="inline-flex items-center space-x-1.5 px-2.5 py-0.5 rounded-full bg-[#2a3f3f] text-[#f0cd6e] text-[11px] font-mono font-semibold mb-1 border border-[#f0cd6e]/30">
-            <BrainCircuit className="w-3 h-3 text-[#f0cd6e]" />
-            <span>AI SCENARIO GENERATOR • SAME-CITY GEO POLICY ACTIVE</span>
+    <div className="space-y-5 text-abyss-text font-sans">
+      {/* Top Bento Header */}
+      <div className="rounded-xl bg-abyss-card border border-sand-border p-5 shadow-sm">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div>
+            <div className="inline-flex items-center space-x-1.5 px-2.5 py-0.5 rounded bg-abyss-elevated text-volt text-xs font-mono font-bold border border-sand-border mb-2">
+              <BrainCircuit className="w-3.5 h-3.5 text-volt" />
+              <span>AI SCENARIO GENERATOR • SAME-CITY POLICY ACTIVE</span>
+            </div>
+            <h2 className="text-xl sm:text-2xl font-black text-abyss-text tracking-tight">
+              Screen 3: Recovery Planning (AI Scenario Agent)
+            </h2>
+            <p className="text-xs text-abyss-muted mt-1 max-w-2xl font-mono">
+              Mitigation strategy for facility{' '}
+              <strong className="text-abyss-text">{target.HOSPITAL_ID}</strong> ({targetCity}) holding{' '}
+              <strong className="text-volt">{target.daysCover}d Cover</strong> of{' '}
+              <strong className="text-abyss-text">{target.MATERIAL_ID}</strong>. Required Buffer:{' '}
+              <strong className="text-volt">+{bufferTransferQty} {target.UNIT || 'EA'}</strong> (+5 Days).
+            </p>
           </div>
-          <h2 className="text-xl font-black text-[#e0e8e2] tracking-tight">
-            Screen 3: Recovery Planning (AI Scenario Agent)
-          </h2>
-          <p className="text-xs text-[#e0e8e2]/70 mt-0.5 max-w-2xl">
-            Mitigation options for facility{' '}
-            <strong className="text-white font-mono">{target.HOSPITAL_ID}</strong> in{' '}
-            <strong className="text-[#f0cd6e] font-mono">{targetCity}</strong> holding{' '}
-            <strong className="text-[#f0cd6e] font-mono">{target.daysCover}d Cover</strong> of{' '}
-            <strong className="text-[#89c07e] font-mono">{target.MATERIAL_ID}</strong>. Required Buffer:{' '}
-            <strong className="text-[#f0cd6e] font-mono">+{bufferTransferQty} {target.UNIT || 'EA'}</strong> (+5 Days).
-          </p>
-        </div>
 
-        <button
-          onClick={() => onProceedToCompliance(currentPlan)}
-          className="self-start md:self-center flex items-center space-x-2 px-4 py-2.5 rounded-xl font-black text-xs bg-gradient-to-r from-amber-500 via-orange-500 to-amber-400 text-slate-950 shadow-lg shadow-orange-500/30 hover:brightness-110 active:scale-95 transition-all"
-        >
-          <span>Verify Compliance (Screen 4)</span>
-          <ArrowRight className="w-3.5 h-3.5 text-slate-950" />
-        </button>
+          <button
+            type="button"
+            onClick={() => onProceedToCompliance(currentPlan)}
+            className="self-start md:self-center flex items-center space-x-2 px-4 py-2.5 rounded-xl font-bold text-xs bg-volt text-volt-text hover:bg-volt-hover active:scale-95 transition-all shadow-sm focus-visible:ring-2 focus-visible:ring-[#FFD400]"
+          >
+            <span>Verify Compliance (Screen 4)</span>
+            <ArrowRight className="w-3.5 h-3.5" />
+          </button>
+        </div>
       </div>
 
       {/* Side-by-Side Comparison: Option A vs Option B */}
@@ -200,360 +269,259 @@ export default function Screen3RecoveryPlanning({
         {/* OPTION A: SAME-CITY INTERNAL TRANSFER */}
         <div
           onClick={() => onSelectPlan(optionA)}
-          className={`p-4 rounded-2xl glass-panel border cursor-pointer transition-all duration-150 relative overflow-hidden ${
+          className={`p-5 rounded-xl border cursor-pointer transition-all relative ${
             currentPlan.id === 'OPTION_A'
-              ? 'border-[#89c07e] bg-gradient-to-br from-[#467750]/30 via-[#2c2e35]/90 to-[#2c2e35] shadow-xl ring-2 ring-[#89c07e]/60'
-              : 'border-[#e0e8e2]/15 hover:border-[#89c07e]/40 bg-[#2c2e35]/60'
+              ? 'bg-abyss-elevated border-volt shadow-md ring-1 ring-volt'
+              : 'bg-abyss-card border-sand-border hover:border-volt/50'
           }`}
         >
-          {/* Card Top Pill: SAME-CITY GEO-FILTER BADGE */}
           <div className="flex items-center justify-between mb-2">
-            <span className="inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-full text-[10px] font-mono font-black bg-[#89c07e] text-slate-950">
-              <MapPin className="w-3 h-3 text-slate-950" />
-              <span>GEO-FILTER ACTIVE: SAME-CITY ONLY ({targetCity})</span>
+            <span className="inline-flex items-center space-x-1 px-2.5 py-0.5 rounded text-[10px] font-mono font-bold bg-volt text-volt-text">
+              <MapPin className="w-3 h-3" />
+              <span>GEO-FILTER: SAME-CITY ONLY ({targetCity})</span>
             </span>
 
             <div
               className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
                 currentPlan.id === 'OPTION_A'
-                  ? 'border-[#89c07e] bg-[#89c07e] text-[#2c2e35]'
-                  : 'border-[#e0e8e2]/30'
+                  ? 'border-volt bg-volt text-volt-text'
+                  : 'border-sand-border'
               }`}
             >
               {currentPlan.id === 'OPTION_A' && <CheckCircle2 className="w-3.5 h-3.5 font-bold" />}
             </div>
           </div>
 
-          <h3 className="text-base font-bold text-white tracking-tight">{optionA.title}</h3>
-          <p className="text-xs text-[#e0e8e2]/70 mt-1 line-clamp-2">{optionA.description}</p>
+          <h3 className="text-base font-bold text-abyss-text tracking-tight">{optionA.title}</h3>
+          <p className="text-xs text-abyss-muted mt-1 leading-relaxed">{optionA.description}</p>
 
           {/* Compressed 4-Parameter Grid */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 my-3 font-mono text-xs">
-            {/* 1. Lead Time */}
-            <div className="p-2 rounded-xl bg-[#2a3f3f]/60 border border-[#e0e8e2]/10">
-              <span className="text-[#e0e8e2]/60 block text-[9px] uppercase font-sans font-bold flex items-center gap-1">
-                <Clock className="w-3 h-3 text-[#89c07e]" /> Lead Time
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 my-4 font-mono text-xs">
+            <div className="p-2.5 rounded-lg bg-abyss-card border border-sand-border">
+              <span className="text-abyss-muted block text-[10px] uppercase font-sans font-bold flex items-center gap-1">
+                <Clock className="w-3 h-3 text-volt" /> Lead Time
               </span>
-              <span className="text-sm font-black text-[#89c07e] block mt-0.5">0 Days</span>
-              <span className="text-[9px] text-[#89c07e] block truncate">Same-City Hub</span>
+              <span className="text-sm font-black text-volt block mt-0.5">0 Days</span>
+              <span className="text-[10px] text-abyss-muted block truncate">Same-City Hub</span>
             </div>
 
-            {/* 2. Cost */}
-            <div className="p-2 rounded-xl bg-[#2a3f3f]/60 border border-[#e0e8e2]/10">
-              <span className="text-[#e0e8e2]/60 block text-[9px] uppercase font-sans font-bold flex items-center gap-1">
-                <DollarSign className="w-3 h-3 text-[#89c07e]" /> Cost
+            <div className="p-2.5 rounded-lg bg-abyss-card border border-sand-border">
+              <span className="text-abyss-muted block text-[10px] uppercase font-sans font-bold flex items-center gap-1">
+                <DollarSign className="w-3 h-3 text-volt" /> Transit Cost
               </span>
-              <span className="text-sm font-black text-white block mt-0.5">₹250</span>
-              <span className="text-[9px] text-[#e0e8e2]/60 block truncate">₹15/unit transit</span>
+              <span className="text-sm font-black text-abyss-text block mt-0.5">₹250</span>
+              <span className="text-[10px] text-abyss-muted block truncate">₹15/unit fee</span>
             </div>
 
-            {/* 3. Compliance Status */}
-            <div className="p-2 rounded-xl bg-[#2a3f3f]/60 border border-[#e0e8e2]/10">
-              <span className="text-[#e0e8e2]/60 block text-[9px] uppercase font-sans font-bold flex items-center gap-1">
-                <ShieldCheck className="w-3 h-3 text-[#89c07e]" /> Compliance
+            <div className="p-2.5 rounded-lg bg-abyss-card border border-sand-border">
+              <span className="text-abyss-muted block text-[10px] uppercase font-sans font-bold flex items-center gap-1">
+                <ShieldCheck className="w-3 h-3 text-volt" /> Cold-Chain
               </span>
-              <span className="text-xs font-bold text-[#89c07e] block mt-0.5">100% Valid</span>
-              <span className="text-[9px] text-[#89c07e] block truncate">Cold-Chain (Y)</span>
+              <span className="text-xs font-bold text-abyss-text block mt-0.5">100% Valid</span>
+              <span className="text-[10px] text-volt block truncate font-bold">Compliant (Y)</span>
             </div>
 
-            {/* 4. Risk Level */}
-            <div className="p-2 rounded-xl bg-[#2a3f3f]/60 border border-[#e0e8e2]/10">
-              <span className="text-[#e0e8e2]/60 block text-[9px] uppercase font-sans font-bold flex items-center gap-1">
-                <ShieldAlert className="w-3 h-3 text-[#89c07e]" /> Risk Level
+            <div className="p-2.5 rounded-lg bg-abyss-card border border-sand-border">
+              <span className="text-abyss-muted block text-[10px] uppercase font-sans font-bold flex items-center gap-1">
+                <ShieldAlert className="w-3 h-3 text-volt" /> Risk Level
               </span>
-              <span className="text-xs font-black text-[#89c07e] block mt-0.5">MINIMAL</span>
-              <span className="text-[9px] text-[#89c07e] block truncate">No Inter-City Delay</span>
+              <span className="text-xs font-black text-volt block mt-0.5">MINIMAL</span>
+              <span className="text-[10px] text-abyss-muted block truncate">Pre-Cleared</span>
             </div>
           </div>
 
-          <div className="p-2 rounded-xl bg-[#467750]/20 border border-[#89c07e]/30 text-[11px] text-[#89c07e] flex items-center space-x-2">
-            <CheckCircle2 className="w-3.5 h-3.5 shrink-0 text-[#89c07e]" />
-            <span className="truncate">
-              Surplus Hub H005 ({targetCity}) selected. Cross-city facility H006 (Indore) excluded.
-            </span>
+          <div className="text-[11px] font-mono text-abyss-muted flex items-center justify-between border-t border-sand-border pt-2.5">
+            <span>Source: <strong className="text-abyss-text">{optionA.source}</strong></span>
+            <CopyButton text={optionA.fromHospital} label="Hub ID" />
           </div>
         </div>
 
-        {/* OPTION B: COMMERCIAL PROCUREMENT / LIVE SUPPLIER BIDS */}
+        {/* OPTION B: COMMERCIAL PROCUREMENT */}
         <div
           onClick={() => onSelectPlan(optionB)}
-          className={`p-4 rounded-2xl glass-panel border cursor-pointer transition-all duration-150 relative overflow-hidden ${
+          className={`p-5 rounded-xl border cursor-pointer transition-all relative ${
             currentPlan.id === 'OPTION_B'
-              ? 'border-[#f0cd6e] bg-gradient-to-br from-[#f0cd6e]/15 via-[#2c2e35]/90 to-[#2c2e35] shadow-xl ring-2 ring-[#f0cd6e]/60'
-              : 'border-[#e0e8e2]/15 hover:border-[#f0cd6e]/40 bg-[#2c2e35]/60'
+              ? 'bg-abyss-elevated border-volt shadow-md ring-1 ring-volt'
+              : 'bg-abyss-card border-sand-border hover:border-volt/50'
           }`}
         >
-          {/* Card Top Pill */}
           <div className="flex items-center justify-between mb-2">
-            <div className="flex items-center space-x-1.5">
-              <span className="inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold bg-[#2a3f3f] text-[#f0cd6e] border border-[#f0cd6e]/30">
-                <Truck className="w-3 h-3" />
-                <span>{matchingSupplier.isLiveBid ? 'LIVE SUPPLIER BID' : 'COMMERCIAL PROCUREMENT'}</span>
-              </span>
-
-              {liveBidsForMaterial.length > 0 && (
-                <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-[#89c07e]/20 text-[#89c07e] border border-[#89c07e]/40 font-semibold flex items-center gap-1">
-                  <Zap className="w-2.5 h-2.5 text-[#89c07e]" />
-                  <span>{liveBidsForMaterial.length} Portal Bids</span>
-                </span>
-              )}
-            </div>
+            <span className="inline-flex items-center space-x-1 px-2.5 py-0.5 rounded text-[10px] font-mono font-bold bg-abyss-card text-volt border border-sand-border">
+              <Truck className="w-3 h-3" />
+              <span>{matchingSupplier.isLiveBid ? 'LIVE SUPPLIER BID' : 'COMMERCIAL PROCUREMENT'}</span>
+            </span>
 
             <div
               className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
                 currentPlan.id === 'OPTION_B'
-                  ? 'border-[#f0cd6e] bg-[#f0cd6e] text-[#2c2e35]'
-                  : 'border-[#e0e8e2]/30'
+                  ? 'border-volt bg-volt text-volt-text'
+                  : 'border-sand-border'
               }`}
             >
               {currentPlan.id === 'OPTION_B' && <CheckCircle2 className="w-3.5 h-3.5 font-bold" />}
             </div>
           </div>
 
-          <h3 className="text-base font-bold text-white tracking-tight">{optionB.title}</h3>
-          <p className="text-xs text-[#e0e8e2]/70 mt-1 line-clamp-2">{optionB.description}</p>
+          <h3 className="text-base font-bold text-abyss-text tracking-tight">{optionB.title}</h3>
+          <p className="text-xs text-abyss-muted mt-1 leading-relaxed">{optionB.description}</p>
 
           {/* Compressed 4-Parameter Grid */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 my-3 font-mono text-xs">
-            {/* 1. Lead Time */}
-            <div className="p-2 rounded-xl bg-[#2a3f3f]/60 border border-[#e0e8e2]/10">
-              <span className="text-[#e0e8e2]/60 block text-[9px] uppercase font-sans font-bold flex items-center gap-1">
-                <Clock className="w-3 h-3 text-[#f0cd6e]" /> Lead Time
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 my-4 font-mono text-xs">
+            <div className="p-2.5 rounded-lg bg-abyss-card border border-sand-border">
+              <span className="text-abyss-muted block text-[10px] uppercase font-sans font-bold flex items-center gap-1">
+                <Clock className="w-3 h-3 text-volt" /> Lead Time
               </span>
-              <span className="text-sm font-black text-[#f0cd6e] block mt-0.5">
-                {matchingSupplier.LEAD_TIME} Days
-              </span>
-              <span className="text-[9px] text-[#f0cd6e] block truncate">
-                {matchingSupplier.LEAD_TIME * 24}h Courier
-              </span>
+              <span className="text-sm font-black text-abyss-text block mt-0.5">{matchingSupplier.LEAD_TIME} Days</span>
+              <span className="text-[10px] text-abyss-muted block truncate">{matchingSupplier.LEAD_TIME * 24}h Courier</span>
             </div>
 
-            {/* 2. Cost */}
-            <div className="p-2 rounded-xl bg-[#2a3f3f]/60 border border-[#e0e8e2]/10">
-              <span className="text-[#e0e8e2]/60 block text-[9px] uppercase font-sans font-bold flex items-center gap-1">
-                <DollarSign className="w-3 h-3 text-[#f0cd6e]" /> Cost
+            <div className="p-2.5 rounded-lg bg-abyss-card border border-sand-border">
+              <span className="text-abyss-muted block text-[10px] uppercase font-sans font-bold flex items-center gap-1">
+                <DollarSign className="w-3 h-3 text-volt" /> Total Cost
               </span>
-              <span className="text-sm font-black text-[#f0cd6e] block mt-0.5">
+              <span className="text-sm font-black text-volt block mt-0.5">
                 ₹{(bufferTransferQty * matchingSupplier.UNIT_COST).toLocaleString()}
               </span>
-              <span className="text-[9px] text-[#e0e8e2]/60 block truncate">
-                ₹{matchingSupplier.UNIT_COST}/unit
-              </span>
+              <span className="text-[10px] text-abyss-muted block truncate">₹{matchingSupplier.UNIT_COST}/unit</span>
             </div>
 
-            {/* 3. Compliance Status */}
-            <div className="p-2 rounded-xl bg-[#2a3f3f]/60 border border-[#e0e8e2]/10">
-              <span className="text-[#e0e8e2]/60 block text-[9px] uppercase font-sans font-bold flex items-center gap-1">
-                <ShieldCheck className="w-3 h-3 text-[#89c07e]" /> Compliance
+            <div className="p-2.5 rounded-lg bg-abyss-card border border-sand-border">
+              <span className="text-abyss-muted block text-[10px] uppercase font-sans font-bold flex items-center gap-1">
+                <ShieldCheck className="w-3 h-3 text-volt" /> Cold-Chain
               </span>
-              <span
-                className={`text-xs font-bold block mt-0.5 ${
-                  matchingSupplier.COMPLIANCE === 'Y' ? 'text-[#89c07e]' : 'text-red-400'
-                }`}
-              >
+              <span className={`text-xs font-bold block mt-0.5 ${matchingSupplier.COMPLIANCE === 'Y' ? 'text-abyss-text' : 'text-red-400'}`}>
                 {matchingSupplier.COMPLIANCE === 'Y' ? 'Certified' : 'Flagged (N)'}
               </span>
-              <span className="text-[9px] text-[#e0e8e2]/60 block truncate">
-                {matchingSupplier.COMPLIANCE === 'Y' ? 'Cold-Chain (Y)' : 'Excursion'}
+              <span className="text-[10px] text-abyss-muted block truncate">
+                {matchingSupplier.COMPLIANCE === 'Y' ? 'Cold-Chain (Y)' : 'Excursion Risk'}
               </span>
             </div>
 
-            {/* 4. Risk Level */}
-            <div className="p-2 rounded-xl bg-[#2a3f3f]/60 border border-[#e0e8e2]/10">
-              <span className="text-[#e0e8e2]/60 block text-[9px] uppercase font-sans font-bold flex items-center gap-1">
-                <ShieldAlert className="w-3 h-3 text-[#f0cd6e]" /> Risk Level
+            <div className="p-2.5 rounded-lg bg-abyss-card border border-sand-border">
+              <span className="text-abyss-muted block text-[10px] uppercase font-sans font-bold flex items-center gap-1">
+                <ShieldAlert className="w-3 h-3 text-volt" /> Risk Level
               </span>
-              <span
-                className={`text-xs font-extrabold block mt-0.5 ${
-                  matchingSupplier.COMPLIANCE === 'Y' ? 'text-[#f0cd6e]' : 'text-red-400'
-                }`}
-              >
+              <span className={`text-xs font-black block mt-0.5 ${matchingSupplier.COMPLIANCE === 'Y' ? 'text-volt' : 'text-red-400'}`}>
                 {matchingSupplier.COMPLIANCE === 'Y' ? 'MODERATE' : 'CRITICAL'}
               </span>
-              <span className="text-[9px] text-[#e0e8e2]/60 block truncate">Commercial Port</span>
+              <span className="text-[10px] text-abyss-muted block truncate">Commercial Fleet</span>
             </div>
           </div>
 
-          {/* Quick Quote Selector (if live bids exist) */}
-          {liveBidsForMaterial.length > 0 && (
-            <div className="p-2 rounded-xl bg-[#2a3f3f]/50 border border-[#89c07e]/30 text-[11px] flex items-center justify-between">
-              <span className="text-[#89c07e] font-mono font-bold flex items-center gap-1">
-                <Tag className="w-3 h-3" /> Select Live Quote:
-              </span>
-              <div className="flex items-center space-x-1.5">
-                {liveBidsForMaterial.map((b) => (
-                  <button
-                    key={b.id}
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setSelectedBidId(b.id);
-                    }}
-                    className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold transition-all ${
-                      selectedBidId === b.id
-                        ? 'bg-[#f0cd6e] text-slate-950 font-black'
-                        : 'bg-[#2a3f3f] text-[#e0e8e2]/80 hover:text-white'
-                    }`}
-                  >
-                    {b.supplierId} (₹{b.unitCost})
-                  </button>
-                ))}
+          <div className="text-[11px] font-mono text-abyss-muted flex items-center justify-between border-t border-sand-border pt-2.5">
+            <span>Vendor: <strong className="text-abyss-text">{matchingSupplier.SUPPLIER_NAME}</strong></span>
+            <CopyButton text={matchingSupplier.SUPPLIER_ID} label="Vendor ID" />
+          </div>
+        </div>
+      </div>
+
+      {/* SAP S/4HANA Supplier Intelligence & Auto-Cascade Section (Safe Rendering) */}
+      <div className="rounded-xl bg-abyss-card border border-sand-border p-5 space-y-4 shadow-sm">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-sand-border pb-3">
+          <div className="flex items-center space-x-2">
+            <Cpu className="w-5 h-5 text-volt" />
+            <div>
+              <h3 className="text-sm sm:text-base font-bold text-abyss-text tracking-tight flex items-center gap-2">
+                <span>SAP S/4HANA Supplier Intelligence & Auto-Cascade Ranking</span>
+                <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-abyss-elevated text-volt border border-sand-border font-bold">
+                  HANA Scoring Engine
+                </span>
+              </h3>
+              <p className="text-xs text-abyss-muted font-mono">
+                Multi-factor ranking: SAP TrustScore, Tier rating, OSRM road velocity & environmental risk
+              </p>
+            </div>
+          </div>
+          <div className="text-xs font-mono text-abyss-muted">
+            Evaluated: <strong className="text-abyss-text">{recommendationData?.totalEvaluated || 0}</strong> • Eligible: <strong className="text-volt">{recommendationData?.eligibleCount || 0}</strong> • Disqualified: <strong className="text-red-400">{recommendationData?.blockedCount || 0}</strong>
+          </div>
+        </div>
+
+        {/* Primary Recommended Feasible Vendor Card */}
+        {recommendationData?.primaryRecommendation ? (
+          <div className="p-4 rounded-xl bg-abyss-elevated border border-sand-border space-y-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="flex items-center space-x-2">
+                <span className="px-2.5 py-0.5 rounded bg-volt text-volt-text text-[10px] font-mono font-bold uppercase flex items-center gap-1">
+                  <Crown className="w-3 h-3" /> #1 Recommended Feasible Vendor
+                </span>
+                <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-abyss-card text-volt border border-sand-border font-bold">
+                  {recommendationData.primaryRecommendation.supplierTier} TIER
+                </span>
+              </div>
+              <div className="text-xs font-mono text-abyss-muted">
+                TrustScore: <strong className="text-volt">{recommendationData.primaryRecommendation.trustScore} / 100</strong>
               </div>
             </div>
-          )}
-        </div>
-      </div>
 
-      {/* Compressed Executive Parameter Comparison Matrix Table */}
-      <div className="rounded-2xl glass-panel border border-[#e0e8e2]/15 overflow-hidden bg-[#2c2e35]/80 shadow-lg">
-        <div className="px-4 py-2 bg-[#2a3f3f]/50 border-b border-[#e0e8e2]/10 flex items-center justify-between">
-          <div className="flex items-center space-x-2">
-            <Layers className="w-3.5 h-3.5 text-[#89c07e]" />
-            <h4 className="text-xs font-bold uppercase tracking-wider text-white">
-              Recovery Scenario Comparison Matrix (4 Decision Dimensions)
-            </h4>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div>
+                <h4 className="text-base font-bold text-abyss-text">
+                  {recommendationData.primaryRecommendation.supplierName} ({recommendationData.primaryRecommendation.supplierId})
+                </h4>
+                <p className="text-xs font-mono text-abyss-muted mt-0.5">
+                  Rate: <strong className="text-volt">₹{recommendationData.primaryRecommendation.unitCost}/unit</strong> • Capacity: <strong className="text-abyss-text">{recommendationData.primaryRecommendation.capacity} EA</strong> • Max Allowed Lead: <strong className="text-abyss-text">{recommendationData.primaryRecommendation.maxAllowedLeadDays}d</strong>
+                </p>
+              </div>
+              <CopyButton text={recommendationData.primaryRecommendation.supplierId} label="Supplier ID" />
+            </div>
+
+            {/* Embedded Live Route Map */}
+            <DeliveryRouteMap
+              route={{
+                originId: recommendationData.primaryRecommendation.supplierId,
+                destId: target.HOSPITAL_ID,
+                distanceKm: recommendationData.primaryRecommendation.distanceKm,
+                durationHours: recommendationData.primaryRecommendation.durationHours,
+                maxAllowedLeadDays: recommendationData.primaryRecommendation.maxAllowedLeadDays,
+                geojson: recommendationData.primaryRecommendation.geojson,
+                originCoords: recommendationData.primaryRecommendation.originCoords,
+                destCoords: recommendationData.primaryRecommendation.destCoords,
+              }}
+              originName={recommendationData.primaryRecommendation.supplierName}
+              destName={target.HOSPITAL_NAME || target.HOSPITAL_ID}
+              height="260px"
+            />
           </div>
-          <span className="text-[10px] font-mono text-[#89c07e] bg-[#2a3f3f] px-2 py-0.5 rounded-full border border-[#89c07e]/30">
-            Multi-Criteria Decision Analysis
-          </span>
-        </div>
-
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse text-xs font-mono">
-            <thead>
-              <tr className="border-b border-[#e0e8e2]/10 bg-[#2c2e35]/90 text-[#e0e8e2]/60 text-[10px] uppercase tracking-wider">
-                <th className="py-2 px-4">Parameter</th>
-                <th className="py-2 px-4 text-[#89c07e]">Option A: Same-City Hub H005 ({targetCity})</th>
-                <th className="py-2 px-4 text-[#f0cd6e]">Option B: Commercial ({matchingSupplier.SUPPLIER_ID})</th>
-                <th className="py-2 px-4 text-right">Advantage</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-[#e0e8e2]/10">
-              {/* 1. Lead Time */}
-              <tr className="hover:bg-[#2a3f3f]/30">
-                <td className="py-2 px-4 font-bold text-white flex items-center space-x-2 font-sans">
-                  <Clock className="w-3.5 h-3.5 text-[#89c07e]" />
-                  <span>Lead Time</span>
-                </td>
-                <td className="py-2 px-4 text-[#89c07e] font-extrabold text-xs">
-                  0 Days <span className="text-[10px] text-[#e0e8e2]/60 font-normal font-sans">(Same-City Dispatch)</span>
-                </td>
-                <td className="py-2 px-4 text-[#f0cd6e] font-bold">
-                  {matchingSupplier.LEAD_TIME} Days <span className="text-[10px] text-[#e0e8e2]/60 font-normal font-sans">({matchingSupplier.LEAD_TIME * 24}h Courier)</span>
-                </td>
-                <td className="py-2 px-4 text-right">
-                  <span className="px-2 py-0.5 rounded-full bg-[#467750]/30 text-[#89c07e] text-[10px] font-bold border border-[#89c07e]/30 font-sans">
-                    Option A (+{matchingSupplier.LEAD_TIME}d Faster)
-                  </span>
-                </td>
-              </tr>
-
-              {/* 2. Cost */}
-              <tr className="hover:bg-[#2a3f3f]/30">
-                <td className="py-2 px-4 font-bold text-white flex items-center space-x-2 font-sans">
-                  <DollarSign className="w-3.5 h-3.5 text-[#89c07e]" />
-                  <span>Cost</span>
-                </td>
-                <td className="py-2 px-4 text-[#89c07e] font-extrabold text-xs">
-                  ₹250 Total <span className="text-[10px] text-[#e0e8e2]/60 font-normal font-sans">(₹15/unit transit fee)</span>
-                </td>
-                <td className="py-2 px-4 text-[#f0cd6e] font-bold">
-                  ₹{(bufferTransferQty * matchingSupplier.UNIT_COST).toLocaleString()} Total <span className="text-[10px] text-[#e0e8e2]/60 font-normal font-sans">(₹{matchingSupplier.UNIT_COST}/unit)</span>
-                </td>
-                <td className="py-2 px-4 text-right">
-                  <span className="px-2 py-0.5 rounded-full bg-[#467750]/30 text-[#89c07e] text-[10px] font-bold border border-[#89c07e]/30 font-sans">
-                    Option A Saves ₹{(bufferTransferQty * matchingSupplier.UNIT_COST - 250).toLocaleString()}
-                  </span>
-                </td>
-              </tr>
-
-              {/* 3. Compliance Status */}
-              <tr className="hover:bg-[#2a3f3f]/30">
-                <td className="py-2 px-4 font-bold text-white flex items-center space-x-2 font-sans">
-                  <ShieldCheck className="w-3.5 h-3.5 text-[#89c07e]" />
-                  <span>Compliance Status</span>
-                </td>
-                <td className="py-2 px-4 text-[#89c07e] font-bold">
-                  <div className="inline-flex items-center space-x-1 px-2 py-0.5 rounded bg-[#467750]/30 border border-[#89c07e]/40 text-[10px]">
-                    <CheckCircle2 className="w-3 h-3 text-[#89c07e]" />
-                    <span>Verified Cold-Chain (Y)</span>
-                  </div>
-                </td>
-                <td className="py-2 px-4 font-bold">
-                  {matchingSupplier.COMPLIANCE === 'Y' ? (
-                    <div className="inline-flex items-center space-x-1 px-2 py-0.5 rounded bg-[#467750]/20 text-[#89c07e] border border-[#89c07e]/30 text-[10px]">
-                      <CheckCircle2 className="w-3 h-3" />
-                      <span>Cold-Chain Certified (Y)</span>
-                    </div>
-                  ) : (
-                    <div className="inline-flex items-center space-x-1 px-2 py-0.5 rounded bg-red-950/80 text-red-300 border border-red-500/50 text-[10px]">
-                      <AlertTriangle className="w-3 h-3 text-red-400" />
-                      <span>Non-Compliant (N)</span>
-                    </div>
-                  )}
-                </td>
-                <td className="py-2 px-4 text-right">
-                  <span className="px-2 py-0.5 rounded-full bg-[#467750]/30 text-[#89c07e] text-[10px] font-bold border border-[#89c07e]/30 font-sans">
-                    {matchingSupplier.COMPLIANCE === 'Y' ? 'Both Verified' : 'Option A Only'}
-                  </span>
-                </td>
-              </tr>
-
-              {/* 4. Risk Level */}
-              <tr className="hover:bg-[#2a3f3f]/30">
-                <td className="py-2 px-4 font-bold text-white flex items-center space-x-2 font-sans">
-                  <ShieldAlert className="w-3.5 h-3.5 text-[#89c07e]" />
-                  <span>Risk Level</span>
-                </td>
-                <td className="py-2 px-4 text-[#89c07e] font-extrabold">
-                  <span className="px-2 py-0.5 rounded bg-[#467750]/40 text-[#89c07e] border border-[#89c07e]/40 text-[10px]">
-                    MINIMAL (Same-City Pre-Cleared)
-                  </span>
-                </td>
-                <td className="py-2 px-4">
-                  <span
-                    className={`px-2 py-0.5 rounded border font-bold text-[10px] ${
-                      matchingSupplier.COMPLIANCE === 'Y'
-                        ? 'bg-[#f0cd6e]/20 text-[#f0cd6e] border-[#f0cd6e]/30'
-                        : 'bg-red-950 text-red-300 border-red-500/40'
-                    }`}
-                  >
-                    {matchingSupplier.COMPLIANCE === 'Y'
-                      ? 'MODERATE (Transit Delay)'
-                      : 'CRITICAL (Excursion Risk)'}
-                  </span>
-                </td>
-                <td className="py-2 px-4 text-right">
-                  <span className="px-2 py-0.5 rounded-full bg-[#467750]/30 text-[#89c07e] text-[10px] font-bold border border-[#89c07e]/30 font-sans">
-                    Option A Optimal
-                  </span>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
+        ) : (
+          <div className="p-4 rounded-xl bg-abyss-elevated border border-sand-border text-center text-xs font-mono text-abyss-muted">
+            {loadingRecs ? 'Analyzing SAP HANA supplier intelligence...' : 'No external vendors evaluated for current material.'}
+          </div>
+        )}
       </div>
 
-      {/* Decision Footer */}
-      <div className="p-3.5 rounded-2xl glass-panel border border-[#e0e8e2]/15 bg-[#2c2e35]/80 flex flex-col sm:flex-row items-center justify-between gap-3">
+      {/* Action Footer */}
+      <div className="p-4 rounded-xl bg-abyss-card border border-sand-border flex flex-col sm:flex-row items-center justify-between gap-3 shadow-sm">
         <div>
-          <span className="text-[11px] text-[#e0e8e2]/60">Currently Selected Strategy:</span>
-          <div className="text-xs font-bold text-white flex items-center gap-2">
+          <span className="text-[11px] text-abyss-muted block font-mono">Selected Strategy:</span>
+          <div className="text-xs font-bold text-abyss-text flex items-center gap-2 mt-0.5">
             <span>{currentPlan.title}</span>
-            <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-[#2a3f3f] text-[#f0cd6e] border border-[#f0cd6e]/30">
-              Lead Time: {currentPlan.leadTimeDays}d • Cost: {currentPlan.costFormatted}
+            <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-abyss-elevated text-volt border border-sand-border">
+              Lead Time: {currentPlan.leadTimeDays}d • {currentPlan.costFormatted}
             </span>
           </div>
         </div>
 
         <button
+          type="button"
           onClick={() => onProceedToCompliance(currentPlan)}
-          className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 via-orange-500 to-amber-400 text-slate-950 font-black text-xs shadow-lg shadow-orange-500/30 hover:brightness-110 active:scale-95 transition-all flex items-center justify-center space-x-1.5"
+          className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-volt text-volt-text font-bold text-xs hover:bg-volt-hover active:scale-95 transition-all shadow-sm flex items-center justify-center space-x-1.5 focus-visible:ring-2 focus-visible:ring-[#FFD400]"
         >
           <span>Confirm & Proceed to Compliance Check (Screen 4)</span>
-          <ArrowRight className="w-3.5 h-3.5 text-slate-950" />
+          <ArrowRight className="w-3.5 h-3.5" />
         </button>
       </div>
+
+      {/* Confirmation Modal for Direct Bid Order */}
+      <ConfirmModal
+        isOpen={confirmBidModalOpen}
+        title="Authorize Commercial Bid Order"
+        message={`Are you sure you want to authorize the commercial purchase order with supplier ${pendingBidToAccept?.supplierId} for ${bufferTransferQty} units of ${target.MATERIAL_ID}? This creates an in-transit dispatch batch requiring destination Shopkeeper receipt.`}
+        confirmLabel="Authorize Order"
+        cancelLabel="Cancel"
+        onConfirm={() => handleAcceptBidDirect(pendingBidToAccept?.id)}
+        onClose={() => setConfirmBidModalOpen(false)}
+      />
     </div>
   );
 }

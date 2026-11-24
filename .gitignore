@@ -6,6 +6,7 @@ node_modules/
 # Build artifacts
 dist/
 build/
+!frontend/dist/
 
 # Environment files & Secrets (Strictly Excluded)
 .env
@@ -30,6 +31,10 @@ tests/
 # Root files (Active project is contained in backend/ and frontend/)
 /server.js
 /sapAdapter.js
+/authMiddleware.js
+/geoRoutingService.js
+/externalSensingService.js
+/supabaseClient.js
 /data/
 /package.json
 /package-lock.json
