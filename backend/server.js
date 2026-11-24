@@ -32,6 +32,9 @@ const sapAdapter = require('./sapAdapter');
 // SAP HANA Cloud Analytics Warehouse (Hackfest0418)
 const hanaCloudService = require('./hanaCloudService');
 
+// Governed SAP Generative AI Hub Orchestration Service (0418_PulseChain_Orchestration)
+const sapGenAiService = require('./sapGenAiService');
+
 // Supabase Auth, PostgreSQL RLS & External Services
 const { requireAuth, requireRole, ROLE_ALIASES } = require('./authMiddleware');
 const { calculateRoute } = require('./geoRoutingService');
@@ -1988,6 +1991,7 @@ app.post('/api/reset', async (req, res) => {
 app.get('/api/sap/status', async (req, res) => {
   const status = await sapAdapter.getSapStatus();
   const hanaPing = await hanaCloudService.pingHanaCloud();
+  const genAiStatus = sapGenAiService.getSapGenAiStatus();
   const hanaStatus = {
     connected: hanaPing.connected,
     engine: 'SAP HANA Cloud',
@@ -2002,9 +2006,11 @@ app.get('/api/sap/status', async (req, res) => {
     success: true,
     ...status,
     hanaCloud: hanaStatus,
+    genAiHub: genAiStatus,
     data: {
       ...status,
       hanaCloud: hanaStatus,
+      genAiHub: genAiStatus,
     },
   });
 });
@@ -2016,6 +2022,7 @@ app.get('/api/sap/status', async (req, res) => {
 app.get('/api/status', async (req, res) => {
   const sapStatus = await sapAdapter.getSapStatus();
   const hanaPing = await hanaCloudService.pingHanaCloud();
+  const genAiStatus = sapGenAiService.getSapGenAiStatus();
   const hanaStatus = {
     connected: hanaPing.connected,
     engine: 'SAP HANA Cloud',
@@ -2028,6 +2035,7 @@ app.get('/api/status', async (req, res) => {
     status: 'ONLINE',
     sapStatus: sapStatus,
     hanaCloud: hanaStatus,
+    genAiHub: genAiStatus,
     sapConfig: {
       odataUrl: process.env.SAP_ODATA_URL || 'https://merida.cob.csuchico.edu:8038/sap/opu/odata/sap/ZPLUSE_SRV',
       client: process.env.SAP_CLIENT || '105',
@@ -2645,13 +2653,29 @@ Instructions:
       }
     })().catch(() => {});
 
+    // Governed SAP Generative AI Hub Orchestration execution (0418_PulseChain_Orchestration)
+    let governedAiResult = null;
+    try {
+      governedAiResult = await sapGenAiService.runPulseChainAi({
+        hospitalId: (req.body && req.body.hospitalId) || 'H004',
+        city: (req.body && req.body.city) || 'BHOPAL',
+        inventoryJson: inventoryData,
+        suppliersJson: suppliersData,
+        externalRiskJson: sensingResult,
+      });
+    } catch (govErr) {
+      console.warn('[SAP GenAI Hub Orchestration] Execution notice:', govErr.message);
+    }
+
     return res.status(200).json({
       success: true,
       timestamp: new Date().toISOString(),
-      engine: 'PulseChain 4-Stage Agentic Resilience Orchestrator',
-      aiEngineUsed: aiUsed ? `Google Gemini (${aiUsed})` : 'PulseChain-Deterministic-Agent (Offline Fallback)',
-      aiModel: aiUsed || 'gemini-2.5-flash',
+      engine: 'PulseChain 4-Stage Agentic Resilience Orchestrator (SAP Governed)',
+      aiEngineUsed: governedAiResult?.aiEngine || (aiUsed ? `Google Gemini (${aiUsed})` : 'PulseChain-Deterministic-Agent (Offline Fallback)'),
+      aiModel: governedAiResult?.governance?.model || aiUsed || 'gemini-2.5-flash-lite',
       alert: alertText,
+      governedOrchestration: governedAiResult,
+      genAiHub: sapGenAiService.getSapGenAiStatus(),
       stages: {
         step1_sensing: sensingResult,
         step2_impact: impactResult,

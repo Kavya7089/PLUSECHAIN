@@ -11,6 +11,7 @@ import {
   ShieldCheck,
   RefreshCw,
   Radio,
+  Cpu,
 } from 'lucide-react';
 
 const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000') + '/api';
@@ -79,6 +80,22 @@ export default function ExternalRiskPanel({ hospitalId = 'H004', city = 'BHOPAL'
             <p className="text-xs text-abyss-muted font-mono mt-0.5">
               Target Node: <strong className="text-abyss-text">{hospitalId} ({city})</strong> • Highway freight & cold-chain radar
             </p>
+            <div className="flex flex-wrap items-center gap-2 mt-2">
+              <span
+                className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold bg-abyss-elevated border border-sand-border text-abyss-text shadow-sm"
+                title="Governed SAP Generative AI Hub Pipeline (Resource Group: Learning-AIG, Model: gemini-2.5-flash-lite)"
+              >
+                <Cpu className="w-3 h-3 text-volt" />
+                <span>SAP Generative AI Hub · 0418_PulseChain_Orchestration</span>
+              </span>
+              <span
+                className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold bg-volt/15 text-volt-text dark:text-volt border border-volt/30 shadow-sm"
+                title="SAP Data Privacy Integration (profile-person, profile-email, profile-phone) & Azure Content Safety Active"
+              >
+                <ShieldCheck className="w-3 h-3 text-volt" />
+                <span>PII Masking & Content Safety Active</span>
+              </span>
+            </div>
           </div>
         </div>
 

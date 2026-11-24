@@ -248,6 +248,22 @@ export default function ScreenSuppliers({
                 <p className="text-xs sm:text-sm text-abyss-muted font-mono">
                   Master Vendor Ledger • Contracted Unit Rates & Transfer Durations
                 </p>
+                <div className="flex flex-wrap items-center gap-2 mt-2">
+                  <span
+                    className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold bg-abyss-elevated border border-sand-border text-abyss-text shadow-sm"
+                    title="SAP Generative AI Hub Pipeline (Resource Group: Learning-AIG, Scenario: orchestration)"
+                  >
+                    <Cpu className="w-3 h-3 text-volt" />
+                    <span>SAP Generative AI Hub · 0418_PulseChain_Orchestration</span>
+                  </span>
+                  <span
+                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-volt/15 text-volt-text dark:text-volt border border-volt/30 shadow-sm"
+                    title="DPI Masking (profile-person, profile-email, profile-phone) & Azure Content Safety Active"
+                  >
+                    <ShieldCheck className="w-3 h-3 text-volt" />
+                    <span>PII Masking & Content Safety Active</span>
+                  </span>
+                </div>
               </div>
             </div>
           </div>
@@ -713,6 +729,16 @@ export default function ScreenSuppliers({
                   <p className="text-xs text-abyss-muted font-mono">
                     POST /api/analyze-disruption • Orchestrated AI Agent Chain
                   </p>
+                  <div className="flex flex-wrap items-center gap-2 mt-1.5">
+                    <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-abyss-card text-abyss-text border border-sand-border font-bold flex items-center gap-1">
+                      <Cpu className="w-3 h-3 text-volt" />
+                      SAP Generative AI Hub · 0418_PulseChain_Orchestration
+                    </span>
+                    <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-volt/15 text-volt-text dark:text-volt border border-volt/30 font-bold flex items-center gap-1">
+                      <ShieldCheck className="w-3 h-3 text-volt" />
+                      PII Masking & Content Safety Active
+                    </span>
+                  </div>
                 </div>
               </div>
 

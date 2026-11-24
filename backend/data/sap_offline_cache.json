@@ -382,10 +382,10 @@
       "CITY": "BHOPAL",
       "MATERIAL_ID": "AMX250",
       "MATERIAL_NAME": "Amoxicillin 250mg",
-      "STOCK_QTY": 315,
+      "STOCK_QTY": 415,
       "DAILY_USE": 45,
       "UNIT": "EA",
-      "daysCover": 7
+      "daysCover": 9
     }
   ],
   "suppliers": [
@@ -995,5 +995,5 @@
       "status": "COMPLETED_SUCCESS"
     }
   ],
-  "lastUpdated": "2026-11-24T12:13:18.265Z"
+  "lastUpdated": "2026-11-24T14:09:15.881Z"
 }

@@ -176,15 +176,10 @@ export default function DeliveryRouteMap({
       >
         <ChangeMapView bounds={bounds} />
 
-        {/* High-Performance, Zero-Key CartoDB Voyager / Dark-Matter Tiles (Zero watermarks, enterprise design) */}
+        {/* 100% Free, Zero-Watermark OpenStreetMap Standard Basemap (Themed natively via CSS filters in index.css) */}
         <TileLayer
-          attribution='&copy; <a href="https://carto.com/">CARTO</a> &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-          url={
-            typeof document !== 'undefined' && document.documentElement.classList.contains('light')
-              ? 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png'
-              : 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
-          }
-          subdomains="abcd"
+          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           maxZoom={19}
         />
 
