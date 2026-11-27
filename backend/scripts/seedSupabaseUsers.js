@@ -291,7 +291,7 @@ async function seedUsers() {
                 assigned_cities: ['BHOPAL', 'INDORE', 'JABALPUR'],
                 escalation_email: tenant.email,
               }, { onConflict: 'user_id' });
-          } else if (tenant.role === 'SHOPKEEPER') {
+          } else if (tenant.role === 'SHOPKEEPER' || tenant.role === 'VERIFICATION_OFFICER') {
             await supabaseAdmin
               .from('shopkeepers')
               .upsert({

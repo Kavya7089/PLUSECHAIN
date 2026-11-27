@@ -79,9 +79,9 @@
   3. **`ZPULSE_USERS` (`UserSet`):** Tenant authorization and role scoping mapping to SAP personnel numbers.
 * **Non-Negotiable Architecture Rules:**
   * **Zero React Math:** Trust scores, tiering, and supplier rankings are calculated natively in SAP HANA SQL pushdown inside S/4HANA—never mocked or calculated client-side in React.
-  * **2-Step Shopkeeper Approval Gate:** AI reallocation recommendations **never** write directly to ERP stock. Stock updates happen strictly via a 2-step physical count verification:
-    - **Step 1 (Dispatch Approval):** Sending hospital shopkeeper performs physical stock count and confirms departure -> Deducts inventory from sending hospital in `ZPULSE_INV`.
-    - **Step 2 (Goods Receipt Approval):** Receiving hospital shopkeeper confirms physical arrival and cold-chain integrity -> Increments inventory at receiving hospital in `ZPULSE_INV`.
+  * **2-Step Verification Officer Approval Gate:** AI reallocation recommendations **never** write directly to ERP stock. Stock updates happen strictly via a 2-step physical count verification:
+    - **Step 1 (Dispatch Approval):** Sending hospital Cold-Chain & Stock Verification Officer performs physical stock count and confirms departure -> Deducts inventory from sending hospital in `ZPULSE_INV`.
+    - **Step 2 (Goods Receipt Approval):** Receiving hospital Cold-Chain & Stock Verification Officer confirms physical arrival and cold-chain integrity -> Increments inventory at receiving hospital in `ZPULSE_INV`.
 
 ---
 
@@ -131,7 +131,7 @@ Pre-seeded credentials allow 1-click evaluation from the login screen:
 | :--- | :--- | :--- | :--- |
 | **`admin`** | **Team Techy's** (Regional Admin) | `regional.head@pulsechain.org` | Full corridor visibility across all MP facilities (`ALL`), SAP HANA Cloud analytics, master vendor ledger, systemic disruption runner. |
 | **`manager`** | **Dr. Kavya** (H004 Hospital Manager) | `kavyarajoria9691@gmail.com` | Scoped to Bhopal Apex Care (`H004`). Authorizes peer transfers, audits cold chain, submits post-delivery vendor reviews. |
-| **`shopkeeper`** | **Sejal Tiwari** (H004 Stock Counter) | `tiwarisejal80@gmail.com` | Scoped to Cold-Chain Bay 1 (`H004`). Submits physical stock counts, verifies goods receipts, confirms outbound dispatches. |
+| **`verification_officer`** | **Sejal Tiwari** (H004 Verification Officer) | `tiwarisejal80@gmail.com` | Scoped to Cold-Chain Bay 1 (`H004`). Submits physical stock counts, verifies goods receipts, confirms outbound dispatches. |
 | **`supplier`** | **Saumay Dubey** (V1001 Platinum Vendor) | `soumaydubey073@gmail.com` | Supplier portal for BioPharm Global Logistics (`V1001`). Submits competitive quotes, bids on open hospital RFQs. |
 
 *Default password for all demo personas:* `Pulse@2026` (or `pass123`).
@@ -172,13 +172,13 @@ H004 Hospital Manager reviews AI plan and authorizes transfer request.
 Supabase creates PENDING_DISPATCH audit shipment (S/4HANA stock stays unchanged).
                      │
                      ▼
-[4. SHOPKEEPER DISPATCH APPROVAL]
-Hub H005 Shopkeeper performs physical count in Cold-Chain Bay and clicks Approve Dispatch.
+[4. VERIFICATION OFFICER DISPATCH APPROVAL]
+Hub H005 Cold-Chain & Stock Verification Officer performs physical count in Cold-Chain Bay and clicks Approve Dispatch.
 PulseChain calls S/4HANA OData MERGE -> Deducts 500 EA from H005 in ZPULSE_INV.
                      │
                      ▼
-[5. SHOPKEEPER RECEIPT APPROVAL]
-H004 Shopkeeper receives container, inspects data logger, and clicks Approve Receipt.
+[5. VERIFICATION OFFICER RECEIPT APPROVAL]
+H004 Cold-Chain & Stock Verification Officer receives container, inspects data logger, and clicks Approve Receipt.
 PulseChain calls S/4HANA OData MERGE -> Increments 500 EA at H004 in ZPULSE_INV.
                      │
                      ▼

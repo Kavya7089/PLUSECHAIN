@@ -80,7 +80,7 @@ export default function LoginScreen() {
       supplier_id: regRole === 'SUPPLIER' ? regSupplierId : null,
       city: regRole === 'REGIONAL_ADMIN' ? 'ALL' : regCity,
       region_name: regRole === 'REGIONAL_ADMIN' ? regRegionName : null,
-      warehouse_bay: regRole === 'SHOPKEEPER' ? regWarehouseBay : null,
+      warehouse_bay: ['VERIFICATION_OFFICER', 'COLD_CHAIN_OFFICER', 'SHOPKEEPER', 'STOCK_COUNTER'].includes(regRole) ? regWarehouseBay : null,
     });
 
     if (result.success) {
@@ -92,7 +92,7 @@ export default function LoginScreen() {
     if (roleKey === 'manager') {
       setEmail('kavyarajoria9691@gmail.com');
       setPassword('Pulse@2026');
-    } else if (roleKey === 'shopkeeper') {
+    } else if (roleKey === 'shopkeeper' || roleKey === 'verification_officer' || roleKey === 'cold_chain_officer') {
       setEmail('tiwarisejal80@gmail.com');
       setPassword('Pulse@2026');
     } else if (roleKey === 'manager_indore') {
@@ -121,7 +121,7 @@ export default function LoginScreen() {
           <button
             type="button"
             onClick={toggleTheme}
-            className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-abyss-card dark:bg-abyss-card/80 dark:backdrop-blur-xl border border-sand-border text-abyss-text hover:border-volt text-xs font-mono shadow-md transition-all hover:scale-105 active:scale-95"
+            className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-abyss-card border border-sand-border text-abyss-text hover:border-volt text-xs font-mono shadow-md transition-all hover:scale-105 active:scale-95"
             title={theme === 'dark' ? 'Switch to Light Theme' : 'Switch to Dark Theme'}
           >
             {theme === 'dark' ? (
@@ -145,7 +145,7 @@ export default function LoginScreen() {
             {/* Brand Header with Official PulseChain Logo */}
             <div className="space-y-3">
               <div className="flex items-center space-x-3.5">
-                <div className="w-12 h-12 rounded-xl bg-abyss-card dark:bg-abyss-card/85 dark:backdrop-blur-xl border border-sand-border flex items-center justify-center p-1.5 shadow-lg shrink-0">
+                <div className="w-12 h-12 rounded-xl bg-abyss-card border border-sand-border flex items-center justify-center p-1.5 shadow-lg shrink-0">
                   <img
                     src="/pulsechain-logo.png"
                     alt="PulseChain Logo"
@@ -153,7 +153,7 @@ export default function LoginScreen() {
                   />
                 </div>
                 <div>
-                  <div className="inline-flex items-center space-x-2 px-2.5 py-0.5 rounded-lg bg-abyss-card dark:bg-abyss-card/85 dark:backdrop-blur-md border border-sand-border text-volt text-xs font-mono font-bold">
+                  <div className="inline-flex items-center space-x-2 px-2.5 py-0.5 rounded-lg bg-abyss-card border border-sand-border text-volt text-xs font-mono font-bold">
                     <ShieldCheck className="w-3.5 h-3.5 text-volt" />
                     <span>SAP S/4HANA GATEWAY & SUPABASE AUTH</span>
                   </div>
@@ -168,7 +168,7 @@ export default function LoginScreen() {
             </div>
 
             {/* Quick Demo Sign-In Bento Card (1-Click Switchers) */}
-            <div className="rounded-2xl bg-abyss-card dark:bg-abyss-card/80 dark:backdrop-blur-xl border border-sand-border p-5 space-y-3 shadow-2xl">
+            <div className="rounded-2xl bg-abyss-card border border-sand-border p-5 space-y-3 shadow-2xl">
               <div className="flex items-center justify-between text-xs font-mono text-abyss-muted">
                 <span className="uppercase tracking-wider font-bold flex items-center gap-1.5 text-abyss-text dark:text-volt">
                   <span>Pre-Seeded Tenant Personas</span>
@@ -182,7 +182,7 @@ export default function LoginScreen() {
                   type="button"
                   onClick={() => handleQuickDemo('admin')}
                   disabled={authLoading}
-                  className="p-3 rounded-xl bg-abyss-elevated dark:bg-abyss-elevated/75 dark:backdrop-blur-md border border-sand-border hover:border-volt hover:bg-abyss-elevated text-left transition-all text-xs space-y-1 focus-visible:ring-2 focus-visible:ring-[#FFD400] shadow-sm"
+                  className="p-3 rounded-xl bg-abyss-elevated border border-sand-border hover:border-volt text-left transition-all text-xs space-y-1 focus-visible:ring-2 focus-visible:ring-[#FFD400] shadow-sm"
                 >
                   <div className="flex items-center justify-between">
                     <span className="font-bold text-abyss-text truncate flex items-center gap-1 text-[11px]">
@@ -199,7 +199,7 @@ export default function LoginScreen() {
                   type="button"
                   onClick={() => handleQuickDemo('manager')}
                   disabled={authLoading}
-                  className="p-3 rounded-xl bg-abyss-elevated dark:bg-abyss-elevated/75 dark:backdrop-blur-md border border-sand-border hover:border-volt hover:bg-abyss-elevated text-left transition-all text-xs space-y-1 focus-visible:ring-2 focus-visible:ring-[#FFD400] shadow-sm"
+                  className="p-3 rounded-xl bg-abyss-elevated border border-sand-border hover:border-volt text-left transition-all text-xs space-y-1 focus-visible:ring-2 focus-visible:ring-[#FFD400] shadow-sm"
                 >
                   <div className="flex items-center justify-between">
                     <span className="font-bold text-abyss-text truncate flex items-center gap-1 text-[11px]">
@@ -211,12 +211,13 @@ export default function LoginScreen() {
                   <div className="text-[9px] text-abyss-muted truncate">Bhopal Apex Care</div>
                 </button>
 
-                {/* 3. H004 Shopkeeper */}
+                {/* 3. H004 Cold-Chain & Stock Verification Officer */}
                 <button
                   type="button"
-                  onClick={() => handleQuickDemo('shopkeeper')}
+                  onClick={() => handleQuickDemo('verification_officer')}
                   disabled={authLoading}
-                  className="p-3 rounded-xl bg-abyss-elevated dark:bg-abyss-elevated/75 dark:backdrop-blur-md border border-sand-border hover:border-volt hover:bg-abyss-elevated text-left transition-all text-xs space-y-1 focus-visible:ring-2 focus-visible:ring-[#FFD400] shadow-sm"
+                  className="p-3 rounded-xl bg-abyss-elevated border border-sand-border hover:border-volt text-left transition-all text-xs space-y-1 focus-visible:ring-2 focus-visible:ring-[#FFD400] shadow-sm"
+                  title="Sign in as Cold-Chain & Stock Verification Officer"
                 >
                   <div className="flex items-center justify-between">
                     <span className="font-bold text-abyss-text truncate flex items-center gap-1 text-[11px]">
@@ -224,8 +225,8 @@ export default function LoginScreen() {
                       <span>Sejal Tiwari</span>
                     </span>
                   </div>
-                  <div className="text-[10px] text-abyss-text dark:text-volt font-mono font-bold">H004 Shopkeeper</div>
-                  <div className="text-[9px] text-abyss-muted truncate">Physical Count & Receipt</div>
+                  <div className="text-[10px] text-abyss-text dark:text-volt font-mono font-bold">Verification Officer</div>
+                  <div className="text-[9px] text-abyss-muted truncate">Cold-Chain & Stock Audit</div>
                 </button>
 
                 {/* 4. H006 Manager (Indore) */}
@@ -233,7 +234,7 @@ export default function LoginScreen() {
                   type="button"
                   onClick={() => handleQuickDemo('manager_indore')}
                   disabled={authLoading}
-                  className="p-3 rounded-xl bg-abyss-elevated dark:bg-abyss-elevated/75 dark:backdrop-blur-md border border-sand-border hover:border-volt hover:bg-abyss-elevated text-left transition-all text-xs space-y-1 focus-visible:ring-2 focus-visible:ring-[#FFD400] shadow-sm"
+                  className="p-3 rounded-xl bg-abyss-elevated border border-sand-border hover:border-volt text-left transition-all text-xs space-y-1 focus-visible:ring-2 focus-visible:ring-[#FFD400] shadow-sm"
                 >
                   <div className="flex items-center justify-between">
                     <span className="font-bold text-abyss-text truncate flex items-center gap-1 text-[11px]">
@@ -250,7 +251,7 @@ export default function LoginScreen() {
                   type="button"
                   onClick={() => handleQuickDemo('supplier')}
                   disabled={authLoading}
-                  className="p-3 rounded-xl bg-abyss-elevated dark:bg-abyss-elevated/75 dark:backdrop-blur-md border border-sand-border hover:border-volt hover:bg-abyss-elevated text-left transition-all text-xs space-y-1 focus-visible:ring-2 focus-visible:ring-[#FFD400] shadow-sm"
+                  className="p-3 rounded-xl bg-abyss-elevated border border-sand-border hover:border-volt text-left transition-all text-xs space-y-1 focus-visible:ring-2 focus-visible:ring-[#FFD400] shadow-sm"
                 >
                   <div className="flex items-center justify-between">
                     <span className="font-bold text-abyss-text truncate flex items-center gap-1 text-[11px]">
@@ -265,9 +266,9 @@ export default function LoginScreen() {
             </div>
 
             {/* Main Auth Form Container with Tabs */}
-            <div className="rounded-2xl bg-abyss-card dark:bg-abyss-card/80 dark:backdrop-blur-xl border border-sand-border p-6 shadow-2xl space-y-5">
+            <div className="rounded-2xl bg-abyss-card border border-sand-border p-6 shadow-2xl space-y-5">
               {/* Tab Toggle: Sign In vs Register */}
-              <div className="flex p-1 rounded-xl bg-abyss-elevated dark:bg-abyss-elevated/75 dark:backdrop-blur-md border border-sand-border font-mono text-xs">
+              <div className="flex p-1 rounded-xl bg-abyss-elevated border border-sand-border font-mono text-xs">
                 <button
                   type="button"
                   onClick={() => setActiveTab('signin')}
@@ -435,14 +436,15 @@ export default function LoginScreen() {
                       className="w-full px-3 py-2 rounded-lg bg-abyss-elevated border border-sand-border text-xs text-abyss-text focus:outline-none focus:border-volt font-mono"
                     >
                       <option value="HOSPITAL_MANAGER">HOSPITAL_MANAGER (Facility Inventory Manager)</option>
-                      <option value="SHOPKEEPER">SHOPKEEPER (Medical Shopkeeper / Physical Auditor)</option>
+                      <option value="VERIFICATION_OFFICER">VERIFICATION_OFFICER (Cold-Chain & Stock Verification Officer)</option>
+                      <option value="SHOPKEEPER">SHOPKEEPER (Legacy Compatibility Mode)</option>
                       <option value="SUPPLIER">SUPPLIER (Commercial Vendor / RFQ Bidder)</option>
                       <option value="REGIONAL_ADMIN">REGIONAL_ADMIN (State Logistics Supervisor)</option>
                     </select>
                   </div>
 
-                  {/* Dynamic Fields for Hospital Managers / Shopkeepers */}
-                  {(regRole === 'HOSPITAL_MANAGER' || regRole === 'SHOPKEEPER') && (
+                  {/* Dynamic Fields for Hospital Managers / Verification Officers */}
+                  {(regRole === 'HOSPITAL_MANAGER' || regRole === 'SHOPKEEPER' || regRole === 'VERIFICATION_OFFICER') && (
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3 rounded-lg bg-abyss-elevated border border-sand-border">
                       <div>
                         <label className="block text-[10px] font-mono uppercase text-volt mb-1 font-bold">
@@ -514,10 +516,10 @@ export default function LoginScreen() {
 
           {/* RIGHT COLUMN: Enterprise S/4HANA Showcase Bento Cards */}
           <div className="lg:col-span-6 space-y-4">
-            <div className="rounded-2xl bg-abyss-card dark:bg-abyss-card/80 dark:backdrop-blur-xl border border-sand-border p-6 shadow-2xl space-y-5">
+            <div className="rounded-2xl bg-abyss-card border border-sand-border p-6 shadow-2xl space-y-5">
               {/* Header */}
               <div className="flex items-center space-x-3.5 border-b border-sand-border pb-4">
-                <div className="w-12 h-12 rounded-xl bg-abyss-elevated dark:bg-abyss-elevated/75 dark:backdrop-blur-md border border-sand-border p-2 flex items-center justify-center shadow-md">
+                <div className="w-12 h-12 rounded-xl bg-abyss-elevated border border-sand-border p-2 flex items-center justify-center shadow-md">
                   <img
                     src="/favicon.svg"
                     alt="PulseChain Emblem"
@@ -538,7 +540,7 @@ export default function LoginScreen() {
 
               {/* 3 Architecture Pillars in Bento Cards */}
               <div className="space-y-3">
-                <div className="p-4 rounded-xl bg-abyss-elevated dark:bg-abyss-elevated/75 dark:backdrop-blur-md border border-sand-border flex items-start space-x-3.5 shadow-sm">
+                <div className="p-4 rounded-xl bg-abyss-elevated border border-sand-border flex items-start space-x-3.5 shadow-sm">
                   <div className="p-2.5 rounded-lg bg-abyss-card text-volt border border-sand-border shrink-0 mt-0.5 shadow-sm">
                     <Database className="w-4 h-4" />
                   </div>
@@ -552,7 +554,7 @@ export default function LoginScreen() {
                   </div>
                 </div>
 
-                <div className="p-4 rounded-xl bg-abyss-elevated dark:bg-abyss-elevated/75 dark:backdrop-blur-md border border-sand-border flex items-start space-x-3.5 shadow-sm">
+                <div className="p-4 rounded-xl bg-abyss-elevated border border-sand-border flex items-start space-x-3.5 shadow-sm">
                   <div className="p-2.5 rounded-lg bg-abyss-card text-volt border border-sand-border shrink-0 mt-0.5 shadow-sm">
                     <Lock className="w-4 h-4" />
                   </div>
@@ -561,12 +563,12 @@ export default function LoginScreen() {
                       Supabase PostgreSQL RLS
                     </h3>
                     <p className="text-xs text-abyss-muted leading-relaxed mt-0.5 font-sans">
-                      Multi-tenant authorization with PostgreSQL Row-Level Security. Enforces strict hospital facility scoping for managers and shopkeepers while isolating vendor proposals.
+                      Multi-tenant authorization with PostgreSQL Row-Level Security. Enforces strict hospital facility scoping for managers and verification officers while isolating vendor proposals.
                     </p>
                   </div>
                 </div>
 
-                <div className="p-4 rounded-xl bg-abyss-elevated dark:bg-abyss-elevated/75 dark:backdrop-blur-md border border-sand-border flex items-start space-x-3.5 shadow-sm">
+                <div className="p-4 rounded-xl bg-abyss-elevated border border-sand-border flex items-start space-x-3.5 shadow-sm">
                   <div className="p-2.5 rounded-lg bg-abyss-card text-volt border border-sand-border shrink-0 mt-0.5 shadow-sm">
                     <Activity className="w-4 h-4" />
                   </div>

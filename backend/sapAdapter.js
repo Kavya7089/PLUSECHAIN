@@ -930,7 +930,7 @@ async function getSapUsers() {
         UserId: 'SK-H004-01',
         Email: 'shopkeeper.h004@pulsechain.org',
         FullName: 'Sejal Tiwari',
-        Role: 'SHOPKEEPER',
+        Role: 'VERIFICATION_OFFICER',
         HospitalId: 'H004',
         SupplierId: '',
         City: 'BHOPAL',
@@ -968,7 +968,7 @@ async function registerUserInSap(user) {
     UserId: String(user.id || user.UserId || '').slice(0, 36),
     Email: String(user.email || user.Email || '').slice(0, 80),
     FullName: String(user.fullName || user.full_name || user.FullName || '').slice(0, 60),
-    Role: String(user.role || user.Role || 'SHOPKEEPER').slice(0, 20),
+    Role: String(user.role || user.Role || 'VERIFICATION_OFFICER').slice(0, 20),
     HospitalId: String(user.hospitalId || user.hospital_id || user.HospitalId || '').slice(0, 10),
     SupplierId: String(user.supplierId || user.supplier_id || user.SupplierId || '').slice(0, 10),
     City: String(user.city || user.City || '').slice(0, 30),
@@ -1019,7 +1019,7 @@ async function registerUserInSap(user) {
 }
 
 /**
- * Updates single hospital stock live in SAP InventorySet (used by Shopkeeper approvals)
+ * Updates single hospital stock live in SAP InventorySet (used by Cold-Chain & Stock Verification Officer approvals)
  * deltaQty > 0 adds stock (receipt approval); deltaQty < 0 deducts stock (dispatch approval)
  */
 async function updateHospitalStockLive(hospitalId, materialId, deltaQty) {

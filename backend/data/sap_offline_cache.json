@@ -56,8 +56,8 @@
       "HOSPITAL_NAME": "Bhopal Apex Care Hospital",
       "CITY": "BHOPAL",
       "MATERIAL_ID": "INS001",
-      "STOCK_QTY": 150,
-      "DAILY_USE": 30,
+      "STOCK_QTY": 450,
+      "DAILY_USE": 25,
       "UNIT": "EA",
       "MATERIAL_NAME": "Insulin Glargine",
       "daysCover": 5
@@ -96,7 +96,7 @@
       "HOSPITAL_NAME": "Central Surplus Logistics Hub H005",
       "CITY": "BHOPAL",
       "MATERIAL_ID": "AMX002",
-      "STOCK_QTY": 2200,
+      "STOCK_QTY": 1975,
       "DAILY_USE": 40,
       "UNIT": "VIAL"
     },
@@ -371,10 +371,10 @@
       "CITY": "BHOPAL",
       "MATERIAL_ID": "AMX250",
       "MATERIAL_NAME": "Amoxicillin 250mg",
-      "STOCK_QTY": 2200,
+      "STOCK_QTY": 1975,
       "DAILY_USE": 40,
       "UNIT": "EA",
-      "daysCover": 55
+      "daysCover": 49
     },
     {
       "HOSPITAL_ID": "H004",
@@ -382,10 +382,10 @@
       "CITY": "BHOPAL",
       "MATERIAL_ID": "AMX250",
       "MATERIAL_NAME": "Amoxicillin 250mg",
-      "STOCK_QTY": 415,
+      "STOCK_QTY": 315,
       "DAILY_USE": 45,
       "UNIT": "EA",
-      "daysCover": 9
+      "daysCover": 7
     }
   ],
   "suppliers": [
@@ -591,6 +591,32 @@
   ],
   "stockAudits": [
     {
+      "id": "CNT-1795804383983",
+      "timestamp": "2026-11-27T18:33:03.983Z",
+      "countedBy": "Sejal Tiwari",
+      "email": "tiwarisejal80@gmail.com",
+      "hospitalId": "H004",
+      "city": "BHOPAL",
+      "materialId": "INS001",
+      "stockQty": 450,
+      "dailyUse": 25,
+      "daysCover": 18,
+      "criticalShortage": false
+    },
+    {
+      "id": "CNT-1795793896230",
+      "timestamp": "2026-11-27T15:38:16.230Z",
+      "countedBy": "Sejal Tiwari",
+      "email": "shopkeeper@pulsechain.com",
+      "hospitalId": "H004",
+      "city": "BHOPAL",
+      "materialId": "AMX002",
+      "stockQty": 90,
+      "dailyUse": 45,
+      "daysCover": 2,
+      "criticalShortage": true
+    },
+    {
       "id": "CNT-1795508139883",
       "timestamp": "2026-11-24T08:15:39.883Z",
       "countedBy": "Sejal Tiwari",
@@ -696,6 +722,34 @@
     }
   ],
   "supplierBids": [
+    {
+      "id": "BID-1795793906715",
+      "timestamp": "2026-11-27T15:38:26.715Z",
+      "supplierId": "V1001",
+      "supplier_id": "V1001",
+      "supplierName": "Saumay Dubey",
+      "materialId": "AMX002",
+      "material_id": "AMX002",
+      "rfq_hospital_id": "H004",
+      "rfqHospitalId": "H004",
+      "hospitalId": "H004",
+      "unitCost": 80,
+      "unit_cost": 80,
+      "currency": "INR",
+      "leadTime": 2,
+      "lead_time_days": 2,
+      "capacity": 10000,
+      "offered_qty": 10000,
+      "compliance": "Y",
+      "delayReason": null,
+      "delay_reason": null,
+      "osrmRoute": {
+        "distanceKm": 7.5,
+        "durationHours": 0.2
+      },
+      "status": "ACTIVE_PROPOSAL",
+      "submittedBy": "supplier@pulsechain.com"
+    },
     {
       "id": "BID-1795508145147",
       "timestamp": "2026-11-24T08:15:45.147Z",
@@ -923,6 +977,15 @@
   ],
   "reallocations": [
     {
+      "id": "TX-1795793918728",
+      "timestamp": "2026-11-27T15:38:38.728Z",
+      "materialId": "AMX002",
+      "donorHospital": "H005",
+      "targetHospital": "H004",
+      "quantity": 225,
+      "status": "COMPLETED_SUCCESS"
+    },
+    {
       "id": "TX-1795508153185",
       "timestamp": "2026-11-24T08:15:53.185Z",
       "materialId": "AMX002",
@@ -995,5 +1058,5 @@
       "status": "COMPLETED_SUCCESS"
     }
   ],
-  "lastUpdated": "2026-11-24T14:34:47.374Z"
+  "lastUpdated": "2026-11-27T18:33:03.984Z"
 }

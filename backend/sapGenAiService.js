@@ -207,7 +207,7 @@ async function runPulseChainAi({
       qty: 500,
     },
     clinicalSummary:
-      'SAP ZPULSE_INV stock will only change after the sending and receiving Shopkeepers approve Dispatch and Goods Receipt. Primary supplier V1001 engaged under OSRM road velocity rules with V1003 blocked due to cold-chain excursion.',
+      'SAP ZPULSE_INV stock will only change after the sending and receiving Cold-Chain & Stock Verification Officers approve Dispatch and Goods Receipt. Primary supplier V1001 engaged under OSRM road velocity rules with V1003 blocked due to cold-chain excursion.',
     aiEngine: 'SAP Governed Rule Engine (Deterministic Resilient Fallback)',
     governance: getSapGenAiStatus(),
     maskingApplied: true,

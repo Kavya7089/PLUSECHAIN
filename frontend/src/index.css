@@ -3,17 +3,17 @@
 @tailwind utilities;
 
 :root {
-  /* Dark Mode Default with Glassmorphism (60% Abyss Teal, 30% Sand Putty, 10% Taxi Volt) */
+  /* Dark Mode Default with Scoped Glassmorphism (60% Abyss Teal, 30% Sand Putty, 10% Taxi Volt) */
   --color-abyss-canvas: #081F20;
-  --color-abyss-card: rgba(13, 44, 46, 0.72);
-  --color-abyss-elevated: rgba(19, 59, 62, 0.65);
-  --color-abyss-border: rgba(28, 68, 71, 0.75);
+  --color-abyss-card: #0D2C2E;
+  --color-abyss-elevated: #133B3E;
+  --color-abyss-border: #1C4447;
   --color-abyss-text: #F4F0E8;
   --color-abyss-muted: #C4D1CF;
 
   --color-sand-base: #DDD3C2;
   --color-sand-surface: #EAE2D3;
-  --color-sand-border: rgba(42, 72, 73, 0.75);
+  --color-sand-border: #2A4849;
   --color-sand-text: #081F20;
   --color-sand-muted: #1C3435;
 
@@ -99,7 +99,10 @@ html.light {
 }
 
 html.dark .bento-card,
-:root:not(.light) .bento-card {
+:root:not(.light) .bento-card,
+html.dark .bg-abyss-card,
+:root:not(.light) .bg-abyss-card {
+  background-color: rgba(13, 44, 46, 0.90) !important;
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
   box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.35), inset 0 1px 1px 0 rgba(255, 255, 255, 0.08);
@@ -122,7 +125,10 @@ html.dark .bento-card:hover,
 }
 
 html.dark .bento-elevated,
-:root:not(.light) .bento-elevated {
+:root:not(.light) .bento-elevated,
+html.dark .bg-abyss-elevated,
+:root:not(.light) .bg-abyss-elevated {
+  background-color: rgba(19, 59, 62, 0.85) !important;
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
 }
@@ -143,6 +149,7 @@ html.dark .bento-elevated,
 
 html.dark .glass-panel,
 :root:not(.light) .glass-panel {
+  background-color: rgba(13, 44, 46, 0.90) !important;
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
   box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.35), inset 0 1px 1px 0 rgba(255, 255, 255, 0.08);
@@ -155,21 +162,9 @@ html.dark .glass-panel,
 
 html.dark .glass-panel-elevated,
 :root:not(.light) .glass-panel-elevated {
+  background-color: rgba(19, 59, 62, 0.85) !important;
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
-}
-
-@layer utilities {
-  html.dark .bg-abyss-card,
-  :root:not(.light) .bg-abyss-card {
-    backdrop-filter: blur(16px);
-    -webkit-backdrop-filter: blur(16px);
-  }
-  html.dark .bg-abyss-elevated,
-  :root:not(.light) .bg-abyss-elevated {
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-  }
 }
 
 /* STRICT LIGHT MODE RULES:
@@ -182,6 +177,8 @@ html.light .glass-panel,
 html.light .glass-panel-elevated,
 html.light .bg-abyss-card,
 html.light .bg-abyss-elevated,
+html.light [class*="bg-abyss-card"],
+html.light [class*="bg-abyss-elevated"],
 html.light [class*="backdrop-blur"] {
   backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
@@ -190,7 +187,7 @@ html.light [class*="backdrop-blur"] {
 html.light .bento-card,
 html.light .glass-panel,
 html.light .bg-abyss-card,
-html.light [class*="bg-abyss-card/"] {
+html.light [class*="bg-abyss-card"] {
   background-color: var(--color-abyss-card) !important;
   border-color: var(--color-sand-border) !important;
   box-shadow: 0 4px 16px -2px rgba(8, 31, 32, 0.07), 0 1px 4px 0 rgba(8, 31, 32, 0.04) !important;
@@ -199,7 +196,7 @@ html.light [class*="bg-abyss-card/"] {
 html.light .bento-elevated,
 html.light .glass-panel-elevated,
 html.light .bg-abyss-elevated,
-html.light [class*="bg-abyss-elevated/"] {
+html.light [class*="bg-abyss-elevated"] {
   background-color: var(--color-abyss-elevated) !important;
   border-color: var(--color-sand-border) !important;
 }

@@ -5,9 +5,9 @@ const FAQ_ITEMS = [
   {
     id: 'sap-sync',
     icon: Shield,
-    question: 'How does SAP ZPULSE_INV update via 2-step Shopkeeper approval?',
+    question: 'How does SAP ZPULSE_INV update via 2-step Verification Officer approval?',
     answer:
-      'Inventory adjustments require a strict two-step chain of custody: First, the source hospital shopkeeper authorizes a Physical Dispatch (-QTY committed live to SAP ZPULSE_INV). Second, upon transit arrival, the receiving destination hospital shopkeeper inspects temperature indicators and authorizes a Goods Receipt (+QTY committed live to SAP ZPULSE_INV). No stock quantity is ever created or destroyed client-side.',
+      'Inventory adjustments require a strict two-step chain of custody: First, the source hospital Cold-Chain & Stock Verification Officer authorizes a Physical Dispatch (-QTY committed live to SAP ZPULSE_INV). Second, upon transit arrival, the receiving destination hospital Cold-Chain & Stock Verification Officer inspects temperature data loggers and authorizes a Goods Receipt (+QTY committed live to SAP ZPULSE_INV). No stock quantity is ever created or destroyed client-side.',
   },
   {
     id: 'hana-trust',

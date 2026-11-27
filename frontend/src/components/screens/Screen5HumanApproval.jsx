@@ -114,7 +114,7 @@ export default function Screen5HumanApproval({
             </div>
             <div className="text-abyss-text font-bold text-xs">-SAP ZPULSE_INV Deduction</div>
             <p className="text-[11px] text-abyss-muted font-sans leading-tight">
-              Origin Shopkeeper verifies physical stock count before recording outward dispatch.
+              Origin Cold-Chain & Stock Verification Officer verifies physical stock count before recording outward dispatch.
             </p>
           </div>
 
@@ -126,7 +126,7 @@ export default function Screen5HumanApproval({
             </div>
             <div className="text-abyss-text font-bold text-xs">+SAP ZPULSE_INV Addition</div>
             <p className="text-[11px] text-abyss-muted font-sans leading-tight">
-              Destination Shopkeeper inspects tamper seal & commits stock into receiving hospital.
+              Destination Cold-Chain & Stock Verification Officer inspects tamper seal & commits stock into receiving hospital.
             </p>
           </div>
         </div>

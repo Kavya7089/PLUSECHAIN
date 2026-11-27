@@ -50,7 +50,7 @@ export default function RegionalHeadDashboard() {
   const [regEmail, setRegEmail] = useState('');
   const [regPassword, setRegPassword] = useState('Pulse@2026');
   const [regFullName, setRegFullName] = useState('');
-  const [regRole, setRegRole] = useState('SHOPKEEPER');
+  const [regRole, setRegRole] = useState('VERIFICATION_OFFICER');
   const [regHospitalId, setRegHospitalId] = useState('H004');
   const [regSupplierId, setRegSupplierId] = useState('V1001');
   const [regCity, setRegCity] = useState('BHOPAL');
@@ -220,7 +220,7 @@ export default function RegionalHeadDashboard() {
       supplier_id: regRole === 'SUPPLIER' ? regSupplierId : null,
       city: regRole === 'REGIONAL_ADMIN' ? 'ALL' : regCity,
       region_name: 'MP_CENTRAL_WEST',
-      warehouse_bay: regRole === 'SHOPKEEPER' ? regWarehouseBay : null,
+      warehouse_bay: ['VERIFICATION_OFFICER', 'COLD_CHAIN_OFFICER', 'SHOPKEEPER', 'STOCK_COUNTER'].includes(regRole) ? regWarehouseBay : null,
     });
 
     if (result.success) {
@@ -1045,10 +1045,11 @@ export default function RegionalHeadDashboard() {
                     onChange={(e) => setRegRole(e.target.value)}
                     className="w-full px-3 py-2 rounded-lg bg-abyss-elevated border border-sand-border text-abyss-text focus:outline-none focus:border-volt"
                   >
-                    <option value="HOSPITAL_MANAGER">HOSPITAL_MANAGER</option>
-                    <option value="SHOPKEEPER">SHOPKEEPER</option>
-                    <option value="SUPPLIER">SUPPLIER</option>
-                    <option value="REGIONAL_ADMIN">REGIONAL_ADMIN</option>
+                    <option value="HOSPITAL_MANAGER">HOSPITAL_MANAGER (Facility Manager)</option>
+                    <option value="VERIFICATION_OFFICER">VERIFICATION_OFFICER (Cold-Chain & Stock Verification Officer)</option>
+                    <option value="SHOPKEEPER">SHOPKEEPER (Legacy Shopkeeper Mode)</option>
+                    <option value="SUPPLIER">SUPPLIER (Certified Vendor)</option>
+                    <option value="REGIONAL_ADMIN">REGIONAL_ADMIN (State Supervisor)</option>
                   </select>
                 </div>
 

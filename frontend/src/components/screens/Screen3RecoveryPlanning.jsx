@@ -113,7 +113,7 @@ export default function Screen3RecoveryPlanning({
       if (res.data?.success) {
         setOrderDirectResult({
           type: 'success',
-          message: `Bid accepted! Order created (${res.data.shipment?.id || 'PO-COMMITTED'}). Sent to destination hospital for Shopkeeper receipt approval.`,
+          message: `Bid accepted! Order created (${res.data.shipment?.id || 'PO-COMMITTED'}). Sent to destination hospital for Cold-Chain & Stock Verification Officer receipt approval.`,
           shipment: res.data.shipment,
         });
         if (fetchSupplierBids) fetchSupplierBids();
@@ -516,7 +516,7 @@ export default function Screen3RecoveryPlanning({
       <ConfirmModal
         isOpen={confirmBidModalOpen}
         title="Authorize Commercial Bid Order"
-        message={`Are you sure you want to authorize the commercial purchase order with supplier ${pendingBidToAccept?.supplierId} for ${bufferTransferQty} units of ${target.MATERIAL_ID}? This creates an in-transit dispatch batch requiring destination Shopkeeper receipt.`}
+        message={`Are you sure you want to authorize the commercial purchase order with supplier ${pendingBidToAccept?.supplierId} for ${bufferTransferQty} units of ${target.MATERIAL_ID}? This creates an in-transit dispatch batch requiring destination Cold-Chain & Stock Verification Officer receipt.`}
         confirmLabel="Authorize Order"
         cancelLabel="Cancel"
         onConfirm={() => handleAcceptBidDirect(pendingBidToAccept?.id)}

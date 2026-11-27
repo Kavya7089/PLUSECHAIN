@@ -97,6 +97,18 @@
   ],
   "supplierSla": [
     {
+      "ID": "SLA-MWZ5BR1T-396",
+      "SUPPLIER_ID": "V1001",
+      "MATERIAL_ID": "AMX002",
+      "TRUST_SCORE": 88,
+      "SUPPLIER_TIER": "GOLD",
+      "OSRM_TRAVEL_DAYS": 1,
+      "PROMISED_LEAD_DAYS": 2,
+      "DELAY_FLAG": "N",
+      "DELAY_REASON": "Proposal registered via Supplier Portal",
+      "RECORDED_AT": "2026-11-27T15:38:27.377Z"
+    },
+    {
       "SLA_ID": 3,
       "SUPPLIER_ID": "V1003",
       "MATERIAL_ID": "OXY005",

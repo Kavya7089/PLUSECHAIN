@@ -83,7 +83,7 @@ export default function ShopkeeperPortal() {
         setIncomingReceipts(res.data.incomingReceipts || []);
       }
     } catch (err) {
-      console.warn('[Shopkeeper] Pending shipments fetch note:', err.message);
+      console.warn('[Verification Officer] Pending shipments fetch note:', err.message);
     } finally {
       setLoadingShipments(false);
     }
@@ -190,7 +190,7 @@ export default function ShopkeeperPortal() {
     setShipmentFeedback(null);
     try {
       const res = await axios.post(`${API_BASE_URL}/shipments/${shipmentId}/reject`, {
-        rejection_note: 'Physical inspection failed or inventory discrepancy reported by shopkeeper.',
+        rejection_note: 'Physical inspection failed or inventory discrepancy reported by verification officer.',
       });
       if (res.data?.success) {
         setShipmentFeedback({
@@ -268,7 +268,7 @@ export default function ShopkeeperPortal() {
             <div>
               <div className="flex items-center space-x-2">
                 <h2 className="text-xl sm:text-2xl font-black text-abyss-text tracking-tight">
-                  Hospital Shopkeeper & Goods Control
+                  Verification & Cold-Chain Control Portal
                 </h2>
                 <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-volt text-volt-text">
                   SAP S/4HANA GATEWAY
@@ -276,8 +276,9 @@ export default function ShopkeeperPortal() {
               </div>
               <p className="text-xs text-abyss-muted font-mono mt-0.5">
                 Facility: <strong className="text-abyss-text">{assignedHospitalId}</strong> • City:{' '}
-                <strong className="text-volt">{assignedCity}</strong> • Auditor:{' '}
-                <strong className="text-abyss-text">{user?.name}</strong> • Bay:{' '}
+                <strong className="text-volt">{assignedCity}</strong> • Officer:{' '}
+                <strong className="text-abyss-text">{user?.name}</strong> • Role:{' '}
+                <strong className="text-volt">Cold-Chain & Stock Verification Officer</strong> • Bay:{' '}
                 <strong className="text-abyss-text">{user?.warehouseBay || 'COLD_CHAIN_BAY_1'}</strong>
               </p>
             </div>
@@ -486,7 +487,7 @@ export default function ShopkeeperPortal() {
                   Tab 2: Outgoing Dispatch Approvals (-SAP Stock)
                 </h3>
                 <p className="text-[11px] text-abyss-muted font-mono">
-                  Reallocations originating from {assignedHospitalId}. Stock is deducted live in SAP ZPULSE_INV upon Shopkeeper physical release.
+                  Reallocations originating from {assignedHospitalId}. Stock is deducted live in SAP ZPULSE_INV upon Verification Officer physical release.
                 </p>
               </div>
             </div>

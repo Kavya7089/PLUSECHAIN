@@ -52,10 +52,10 @@ export default function ThreeBackground({ className = '' }) {
           sand: 0x78716c,           // Stone/sand neutral
           cyan: 0x0369a1,           // Rich sapphire blue
           lineColor: 0x0f766e,      // Crisp route lines
-          lineOpacity: 0.28,
-          coreOpacity: 0.72,
-          wireOpacity: 0.55,
-          particleOpacity: 0.65,
+          lineOpacity: 0.20,
+          coreOpacity: 0.25,
+          wireOpacity: 0.40,
+          particleOpacity: 0.45,
         };
       }
       return {
@@ -67,10 +67,10 @@ export default function ThreeBackground({ className = '' }) {
         sand: 0xddd3c2,            // Warm Sand
         cyan: 0x06b6d4,            // Electric Cyan
         lineColor: 0xffd400,       // Radiant Volt lines
-        lineOpacity: 0.32,
-        coreOpacity: 0.60,
-        wireOpacity: 0.45,
-        particleOpacity: 0.65,
+        lineOpacity: 0.25,
+        coreOpacity: 0.35,
+        wireOpacity: 0.35,
+        particleOpacity: 0.50,
       };
     };
 

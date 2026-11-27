@@ -103,11 +103,12 @@ const DEMO_USERS = [
   {
     id: 'U002',
     name: 'Sejal Tiwari',
+    designation: 'Cold-Chain & Stock Verification Officer',
     email: 'shopkeeper.h004@pulsechain.org',
-    aliases: ['tiwarisejal80@gmail.com', 'shopkeeper@pulsechain.com'],
+    aliases: ['tiwarisejal80@gmail.com', 'shopkeeper@pulsechain.com', 'verification.officer@pulsechain.org', 'verification.h004@pulsechain.org'],
     passwordHash: DEMO_PASSWORD_HASH,
-    role: 'SHOPKEEPER',
-    legacyRole: 'STOCK_COUNTER',
+    role: 'VERIFICATION_OFFICER',
+    legacyRole: 'SHOPKEEPER',
     city: 'BHOPAL',
     hospitalId: 'H004',
     supplierId: null,
@@ -197,11 +198,13 @@ const DEMO_USERS = [
   },
   {
     id: 'U009',
-    name: 'Shopkeeper H005 Hub',
+    name: 'Verification Officer H005 Hub',
+    designation: 'Cold-Chain & Stock Verification Officer',
     email: 'shopkeeper.h005@pulsechain.org',
+    aliases: ['verification.h005@pulsechain.org'],
     passwordHash: DEMO_PASSWORD_HASH,
-    role: 'SHOPKEEPER',
-    legacyRole: 'STOCK_COUNTER',
+    role: 'VERIFICATION_OFFICER',
+    legacyRole: 'SHOPKEEPER',
     city: 'BHOPAL',
     hospitalId: 'H005',
     supplierId: null,
@@ -210,11 +213,13 @@ const DEMO_USERS = [
   },
   {
     id: 'U010',
-    name: 'Shopkeeper H006 Indore',
+    name: 'Verification Officer H006 Indore',
+    designation: 'Cold-Chain & Stock Verification Officer',
     email: 'shopkeeper.h006@pulsechain.org',
+    aliases: ['verification.h006@pulsechain.org'],
     passwordHash: DEMO_PASSWORD_HASH,
-    role: 'SHOPKEEPER',
-    legacyRole: 'STOCK_COUNTER',
+    role: 'VERIFICATION_OFFICER',
+    legacyRole: 'SHOPKEEPER',
     city: 'INDORE',
     hospitalId: 'H006',
     supplierId: null,
@@ -575,8 +580,8 @@ app.post('/api/auth/register', async (req, res) => {
     });
   }
 
-  const cleanRole = (role || 'SHOPKEEPER').toUpperCase();
-  const canonicalRole = ROLE_ALIASES[cleanRole] || cleanRole;
+  const cleanRole = (role || 'VERIFICATION_OFFICER').toUpperCase();
+  const canonicalRole = ROLE_ALIASES[cleanRole] || (['SHOPKEEPER', 'STOCK_COUNTER', 'COLD_CHAIN_OFFICER'].includes(cleanRole) ? 'VERIFICATION_OFFICER' : cleanRole);
 
   let createdUser = null;
   let sapSynced = false;
@@ -727,8 +732,10 @@ app.post('/api/auth/login', (req, res) => {
     full_name: user.full_name || user.fullName || user.name,
     email: cleanEmail,
     primaryEmail: user.email,
-    role: user.legacyRole || user.role,
+    role: user.role,
     canonicalRole: user.role,
+    legacyRole: user.legacyRole || 'SHOPKEEPER',
+    designation: user.designation || (user.role === 'VERIFICATION_OFFICER' ? 'Cold-Chain & Stock Verification Officer' : null),
     city: user.city,
     hospitalId: user.hospitalId,
     supplierId: user.supplierId,
@@ -779,7 +786,7 @@ app.get('/api/inventory', optionalAuth, async (req, res) => {
       const userHospital = req.user.hospital_id || req.user.hospitalId;
       const userCity = (req.user.city || '').toUpperCase();
 
-      if (['SHOPKEEPER', 'STOCK_COUNTER'].includes(userRole)) {
+      if (['VERIFICATION_OFFICER', 'COLD_CHAIN_OFFICER', 'SHOPKEEPER', 'STOCK_COUNTER'].includes(userRole)) {
         if (userHospital) {
           records = records.filter((item) => item.HOSPITAL_ID === userHospital);
         }
@@ -806,7 +813,7 @@ app.get('/api/inventory', optionalAuth, async (req, res) => {
       const userHospital = req.user.hospital_id || req.user.hospitalId;
       const userCity = (req.user.city || '').toUpperCase();
 
-      if (['SHOPKEEPER', 'STOCK_COUNTER'].includes(userRole)) {
+      if (['VERIFICATION_OFFICER', 'COLD_CHAIN_OFFICER', 'SHOPKEEPER', 'STOCK_COUNTER'].includes(userRole)) {
         if (userHospital) {
           records = records.filter((item) => item.HOSPITAL_ID === userHospital);
         }
@@ -885,17 +892,17 @@ app.get('/api/inventory/same-city/:hospitalId', (req, res) => {
 
 /**
  * POST /api/stock-count
- * Role: STOCK_COUNTER (Medical Shopkeeper) or INVENTORY_MANAGER
+ * Role: VERIFICATION_OFFICER (Cold-Chain & Stock Verification Officer) or INVENTORY_MANAGER
  * Accepts { hospitalId, materialId, stockQty, dailyUse }
  * Calls SAP RFC Z_PULSE_COUNT_STOCK & triggers dual Nodemailer alert if daysCover < 5.
  */
-app.post('/api/stock-count', verifyRole(['STOCK_COUNTER', 'SHOPKEEPER', 'INVENTORY_MANAGER', 'HOSPITAL_MANAGER', 'REGIONAL_ADMIN']), async (req, res) => {
+app.post('/api/stock-count', verifyRole(['VERIFICATION_OFFICER', 'COLD_CHAIN_OFFICER', 'STOCK_COUNTER', 'SHOPKEEPER', 'INVENTORY_MANAGER', 'HOSPITAL_MANAGER', 'REGIONAL_ADMIN', 'REGIONAL_HEAD']), async (req, res) => {
   let { hospitalId, materialId, stockQty, dailyUse } = req.body;
 
-  // Tenant scoping: Force hospitalId to user's assigned hospital if Shopkeeper
+  // Tenant scoping: Force hospitalId to user's assigned hospital if Verification Officer
   const userRole = (req.user?.role || '').toUpperCase();
   const userHospital = req.user?.hospital_id || req.user?.hospitalId;
-  if (['STOCK_COUNTER', 'SHOPKEEPER'].includes(userRole) && userHospital) {
+  if (['VERIFICATION_OFFICER', 'COLD_CHAIN_OFFICER', 'STOCK_COUNTER', 'SHOPKEEPER'].includes(userRole) && userHospital) {
     hospitalId = userHospital;
   }
 
@@ -1318,7 +1325,7 @@ app.post('/api/transfer', optionalAuth, async (req, res) => {
           message: `Forbidden: Hospital Managers may only authorize inbound transfers to their assigned facility (${userHospital}). Target was ${toHospital}.`,
         });
       }
-    } else if (['SHOPKEEPER', 'STOCK_COUNTER', 'SUPPLIER'].includes(userRole)) {
+    } else if (['VERIFICATION_OFFICER', 'COLD_CHAIN_OFFICER', 'SHOPKEEPER', 'STOCK_COUNTER', 'SUPPLIER'].includes(userRole)) {
       return res.status(403).json({
         success: false,
         message: 'Forbidden: Insufficient permissions to authorize stock transfers.',
@@ -1486,7 +1493,7 @@ app.post('/api/orders/transfer', verifyRole(['HOSPITAL_MANAGER', 'INVENTORY_MANA
 
   return res.status(201).json({
     success: true,
-    message: `Transfer order created and queued for source shopkeeper dispatch approval at ${sourceHospital}. SAP stock will move upon Shopkeeper physical handover.`,
+    message: `Transfer order created and queued for source Cold-Chain & Stock Verification Officer dispatch approval at ${sourceHospital}. SAP stock will move upon physical verification and handover.`,
     shipment,
   });
 });
@@ -1537,16 +1544,16 @@ app.post('/api/bids/:bidId/accept', verifyRole(['HOSPITAL_MANAGER', 'INVENTORY_M
 
   return res.status(200).json({
     success: true,
-    message: `Supplier proposal accepted. Delivery is now IN_TRANSIT and pending Shopkeeper physical receipt verification at ${rfqHospital}.`,
+    message: `Supplier proposal accepted. Delivery is now IN_TRANSIT and pending Cold-Chain & Stock Verification Officer physical receipt verification at ${rfqHospital}.`,
     shipment,
   });
 });
 
 /**
  * GET /api/shipments/pending
- * Lists outgoing dispatches (for source shopkeepers) and incoming receipts (for dest shopkeepers)
+ * Lists outgoing dispatches (for source verification officers) and incoming receipts (for dest verification officers)
  */
-app.get('/api/shipments/pending', verifyRole(['SHOPKEEPER', 'STOCK_COUNTER', 'HOSPITAL_MANAGER', 'INVENTORY_MANAGER', 'REGIONAL_HEAD', 'REGIONAL_ADMIN']), async (req, res) => {
+app.get('/api/shipments/pending', verifyRole(['VERIFICATION_OFFICER', 'COLD_CHAIN_OFFICER', 'SHOPKEEPER', 'STOCK_COUNTER', 'HOSPITAL_MANAGER', 'INVENTORY_MANAGER', 'REGIONAL_HEAD', 'REGIONAL_ADMIN']), async (req, res) => {
   const userHospital = req.user.hospital_id || req.user.hospitalId || 'H004';
   const allShipments = await getShipmentApprovalsFromSupabase();
   const isRegional = ['REGIONAL_HEAD', 'REGIONAL_ADMIN'].includes(req.user.role);
@@ -1568,10 +1575,10 @@ app.get('/api/shipments/pending', verifyRole(['SHOPKEEPER', 'STOCK_COUNTER', 'HO
 
 /**
  * POST /api/shipments/:id/approve-dispatch
- * Step 1: Shopkeeper at source_hospital_id approves physical dispatch.
+ * Step 1: Cold-Chain & Stock Verification Officer at source_hospital_id approves physical dispatch.
  * Deducts stock live from SAP ZPULSE_INV and advances status to IN_TRANSIT.
  */
-app.post('/api/shipments/:id/approve-dispatch', verifyRole(['SHOPKEEPER', 'STOCK_COUNTER', 'REGIONAL_HEAD', 'REGIONAL_ADMIN']), async (req, res) => {
+app.post('/api/shipments/:id/approve-dispatch', verifyRole(['VERIFICATION_OFFICER', 'COLD_CHAIN_OFFICER', 'SHOPKEEPER', 'STOCK_COUNTER', 'REGIONAL_HEAD', 'REGIONAL_ADMIN']), async (req, res) => {
   const { id } = req.params;
   const userHospital = req.user.hospital_id || req.user.hospitalId;
   const isRegional = ['REGIONAL_HEAD', 'REGIONAL_ADMIN'].includes(req.user.role);
@@ -1590,7 +1597,7 @@ app.post('/api/shipments/:id/approve-dispatch', verifyRole(['SHOPKEEPER', 'STOCK
   if (!isRegional && userHospital && shipment.source_hospital_id !== userHospital) {
     return res.status(403).json({
       success: false,
-      error: `Forbidden: Only shopkeepers at source hospital (${shipment.source_hospital_id}) can authorize dispatch. You are at ${userHospital}.`,
+      error: `Forbidden: Only Cold-Chain & Stock Verification Officers at source hospital (${shipment.source_hospital_id}) can authorize dispatch. You are at ${userHospital}.`,
     });
   }
 
@@ -1625,10 +1632,10 @@ app.post('/api/shipments/:id/approve-dispatch', verifyRole(['SHOPKEEPER', 'STOCK
 
 /**
  * POST /api/shipments/:id/approve-receipt
- * Step 2: Shopkeeper at dest_hospital_id confirms physical delivery receipt.
+ * Step 2: Cold-Chain & Stock Verification Officer at dest_hospital_id confirms physical delivery receipt.
  * Adds stock live to SAP ZPULSE_INV and marks shipment DELIVERED (ready for Manager review).
  */
-app.post('/api/shipments/:id/approve-receipt', verifyRole(['SHOPKEEPER', 'STOCK_COUNTER', 'REGIONAL_HEAD', 'REGIONAL_ADMIN']), async (req, res) => {
+app.post('/api/shipments/:id/approve-receipt', verifyRole(['VERIFICATION_OFFICER', 'COLD_CHAIN_OFFICER', 'SHOPKEEPER', 'STOCK_COUNTER', 'REGIONAL_HEAD', 'REGIONAL_ADMIN']), async (req, res) => {
   const { id } = req.params;
   const userHospital = req.user.hospital_id || req.user.hospitalId;
   const isRegional = ['REGIONAL_HEAD', 'REGIONAL_ADMIN'].includes(req.user.role);
@@ -1647,7 +1654,7 @@ app.post('/api/shipments/:id/approve-receipt', verifyRole(['SHOPKEEPER', 'STOCK_
   if (!isRegional && userHospital && shipment.dest_hospital_id !== userHospital) {
     return res.status(403).json({
       success: false,
-      error: `Forbidden: Only shopkeepers at receiving hospital (${shipment.dest_hospital_id}) can approve receipt. You are at ${userHospital}.`,
+      error: `Forbidden: Only Cold-Chain & Stock Verification Officers at receiving hospital (${shipment.dest_hospital_id}) can approve receipt. You are at ${userHospital}.`,
     });
   }
 
@@ -1686,9 +1693,9 @@ app.post('/api/shipments/:id/approve-receipt', verifyRole(['SHOPKEEPER', 'STOCK_
 
 /**
  * POST /api/shipments/:id/reject
- * Shopkeeper rejects PENDING_DISPATCH before any SAP stock movements occur.
+ * Cold-Chain & Stock Verification Officer rejects PENDING_DISPATCH before any SAP stock movements occur.
  */
-app.post('/api/shipments/:id/reject', verifyRole(['SHOPKEEPER', 'STOCK_COUNTER', 'HOSPITAL_MANAGER', 'INVENTORY_MANAGER', 'REGIONAL_HEAD', 'REGIONAL_ADMIN']), async (req, res) => {
+app.post('/api/shipments/:id/reject', verifyRole(['VERIFICATION_OFFICER', 'COLD_CHAIN_OFFICER', 'SHOPKEEPER', 'STOCK_COUNTER', 'HOSPITAL_MANAGER', 'INVENTORY_MANAGER', 'REGIONAL_HEAD', 'REGIONAL_ADMIN']), async (req, res) => {
   const { id } = req.params;
   const { rejection_note } = req.body;
 
@@ -2726,7 +2733,7 @@ const server = app.listen(PORT, async () => {
   console.log(` POST http://localhost:${PORT}/api/auth/login (JWT RBAC)`);
   console.log(` GET  http://localhost:${PORT}/api/inventory`);
   console.log(` GET  http://localhost:${PORT}/api/inventory/same-city/:hospitalId`);
-  console.log(` POST http://localhost:${PORT}/api/stock-count (Shopkeeper & Dual Email)`);
+  console.log(` POST http://localhost:${PORT}/api/stock-count (Verification Officer & Dual Email)`);
   console.log(` POST http://localhost:${PORT}/api/supplier-bid (Live Supplier Portal)`);
   console.log(` GET  http://localhost:${PORT}/api/open-shortages (Public RFQs)`);
   console.log(` POST http://localhost:${PORT}/api/transfer (Agentic Reallocation + Dispatch Email)`);

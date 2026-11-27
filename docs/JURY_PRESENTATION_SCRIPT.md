@@ -14,7 +14,7 @@
 > **Your Job:** Don't repeat the problem! Take the jury on an exciting, real-time journey:
 > 1. Show the crisis happening live in Bhopal.
 > 2. Let Governed SAP AI find the smartest rescue plan.
-> 3. Show why real healthcare requires the physical shopkeeper to verify the box before SAP ERP stock changes.
+> 3. Show why real healthcare requires the physical Cold-Chain & Stock Verification Officer to verify the box before SAP ERP stock changes.
 > 4. Close the loop with live SAP S/4HANA & HANA Cloud integration.
 
 ---
@@ -111,7 +111,7 @@ The Leaflet map shows the live highway polyline.
 ### ACT 3: The Reality Check — Why AI Must Never Touch ERP Alone (1 Minute)
 
 #### 🖥️ Screen Action:
-Click **`Shop`** in the top-right persona switcher to switch to **Sejal Tiwari (Shopkeeper at H004)**.
+Click **`Verify`** in the top-right persona switcher to switch to **Sejal Tiwari (Cold-Chain & Stock Verification Officer at H004)**.
 
 #### 🗣️ What to Say:
 > *(Ask the jury a rhetorical question, leaning forward slightly)*  
@@ -124,13 +124,13 @@ Click **`Shop`** in the top-right persona switcher to switch to **Sejal Tiwari (
 > *In medicine, if an AI autonomously alters an ERP database, but the truck driver accidentally dropped the cooler or the refrigeration battery died on the road, your hospital records say you have insulin when in reality you have spoiled water. That is a regulatory and clinical disaster.*
 >
 > *That’s why PulseChain built the **2-Step Physical Verification Guardrail**:*
-> - *First, the sending shopkeeper at Hub H005 physically inspects the batch and clicks **Approve Dispatch**.*
+> - *First, the sending Cold-Chain & Stock Verification Officer at Hub H005 physically inspects the batch and clicks **Approve Dispatch**.*
 > - *Second, meet Sejal here at Hospital H004. The medicine box arrives at her receiving bay. She opens the cold box, checks the digital data logger, and does a physical count.*
 >
 > *Watch what happens when Sejal clicks **'Submit Verified Physical Count'**..."*
 
 #### 🖥️ Screen Action:
-In the Shopkeeper Portal, click **`Submit Verified Physical Count`** for Insulin / Amoxicillin.  
+In the Verification & Cold-Chain Portal, click **`Submit Verified Physical Count`** for Insulin / Amoxicillin.  
 Show the green toast notification.
 
 #### 🗣️ What to Say:
@@ -163,12 +163,12 @@ Point to the review section.
 ## 💡 Quick Tips for Stage Presence
 
 1. **Don't rush!** Speak at a calm, confident storytelling pace.
-2. **Use the 1-Click Persona Switcher:** The buttons in the top navbar (`H004`, `Shop`, `Admin`, `Vendor`) let you jump roles instantly without typing passwords.
+2. **Use the 1-Click Persona Switcher:** The buttons in the top navbar (`H004`, `Verify`, `Admin`, `Vendor`) let you jump roles instantly without typing passwords.
 3. **If a question gets technical:** Smile and point back to the architecture:
    - S/4HANA = The live transactional heart.
    - HANA Cloud = The executive time-series brain.
    - SAP AI Hub = The governed intelligence with privacy guardrails.
-   - Shopkeeper = The physical reality check.
+   - Cold-Chain & Stock Verification Officer = The physical reality check.
 
 ---
 
@@ -181,7 +181,7 @@ Point to the review section.
 > *"They do two very different jobs: S/4HANA is our live transactional core that handles day-to-day stock balances and goods movement. SAP HANA Cloud on port 443 is our long-term analytical warehouse that logs historical disruption snapshots and runs heavy regional summaries without slowing down the hospital's operational ERP."*
 
 ### 3. "Why not let AI automatically transfer medicines without human approvals?"
-> *"Because under healthcare regulations like FDA 21 CFR Part 11 and Good Distribution Practice, an algorithm cannot smell, touch, or inspect medicine vials. If a cold box failed mid-transit, blind automated database updates create 'ghost stock' that can kill patients. AI recommends; human shopkeepers verify."*
+> *"Because under healthcare regulations like FDA 21 CFR Part 11 and Good Distribution Practice, an algorithm cannot smell, touch, or inspect medicine vials. If a cold box failed mid-transit, blind automated database updates create 'ghost stock' that can kill patients. AI recommends; human verification officers verify."*
 
 ### 4. "What happens if weather or road APIs go down during a storm?"
 > *"PulseChain is built to fail safely. If Open-Meteo or OSRM is unreachable, our backend automatically falls back to cached regional road matrices and historical weather benchmarks. S/4HANA and HANA Cloud keep running without a single hiccup."*

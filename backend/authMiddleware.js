@@ -15,8 +15,10 @@ const ROLE_ALIASES = {
   ADMIN: 'REGIONAL_HEAD',
   HOSPITAL_MANAGER: 'HOSPITAL_MANAGER',
   INVENTORY_MANAGER: 'HOSPITAL_MANAGER',
-  SHOPKEEPER: 'SHOPKEEPER',
-  STOCK_COUNTER: 'SHOPKEEPER',
+  VERIFICATION_OFFICER: 'VERIFICATION_OFFICER',
+  COLD_CHAIN_OFFICER: 'VERIFICATION_OFFICER',
+  SHOPKEEPER: 'VERIFICATION_OFFICER',
+  STOCK_COUNTER: 'VERIFICATION_OFFICER',
   SUPPLIER: 'SUPPLIER',
 };
 
@@ -53,7 +55,7 @@ async function requireAuth(req, res, next) {
           profile = profData;
         } catch (e) {}
 
-        const rawRole = profile?.role || user.user_metadata?.role || 'SHOPKEEPER';
+        const rawRole = profile?.role || user.user_metadata?.role || 'VERIFICATION_OFFICER';
         const normalizedRole = ROLE_ALIASES[rawRole] || rawRole;
 
         // Fetch role specific details
@@ -68,7 +70,7 @@ async function requireAuth(req, res, next) {
               .single();
             regHead = rhData;
           } catch (e) {}
-        } else if (normalizedRole === 'SHOPKEEPER') {
+        } else if (normalizedRole === 'VERIFICATION_OFFICER' || normalizedRole === 'SHOPKEEPER') {
           try {
             const { data: skData } = await supabaseAdmin
               .from('shopkeepers')
@@ -107,7 +109,7 @@ async function requireAuth(req, res, next) {
   // 2. Fallback: Local JWT verification (For demo / offline / test compatibility)
   try {
     const decoded = jwt.verify(token, JWT_SECRET);
-    const rawRole = decoded.role || 'SHOPKEEPER';
+    const rawRole = decoded.role || 'VERIFICATION_OFFICER';
     const normalizedRole = ROLE_ALIASES[rawRole] || rawRole;
 
     req.user = {
@@ -161,14 +163,17 @@ function requireRole(...allowedRoles) {
       return next();
     }
 
-    // Expand allowed roles to support aliases (e.g. SHOPKEEPER or STOCK_COUNTER)
+    // Expand allowed roles to support aliases (e.g. VERIFICATION_OFFICER, SHOPKEEPER or STOCK_COUNTER)
     const expandedAllowed = new Set();
     for (const role of allowedRoles) {
       expandedAllowed.add(role);
       expandedAllowed.add(ROLE_ALIASES[role] || role);
       // Map reverse aliases
       for (const [alias, canonical] of Object.entries(ROLE_ALIASES)) {
-        if (canonical === role) expandedAllowed.add(alias);
+        if (canonical === role || alias === role || canonical === ROLE_ALIASES[role]) {
+          expandedAllowed.add(alias);
+          expandedAllowed.add(canonical);
+        }
       }
     }
 

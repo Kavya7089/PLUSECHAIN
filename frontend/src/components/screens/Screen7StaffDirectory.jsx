@@ -57,7 +57,11 @@ export default function Screen7StaffDirectory() {
     }
 
     if (selectedRole !== 'ALL') {
-      list = list.filter((u) => u.role === selectedRole);
+      if (selectedRole === 'VERIFICATION_OFFICER' || selectedRole === 'SHOPKEEPER') {
+        list = list.filter((u) => ['VERIFICATION_OFFICER', 'COLD_CHAIN_OFFICER', 'SHOPKEEPER', 'STOCK_COUNTER'].includes(u.role));
+      } else {
+        list = list.filter((u) => u.role === selectedRole);
+      }
     }
 
     if (selectedCity !== 'ALL') {
@@ -74,7 +78,7 @@ export default function Screen7StaffDirectory() {
     if (role === 'HOSPITAL_MANAGER' || role === 'INVENTORY_MANAGER') {
       return 'bg-abyss-elevated text-abyss-text border border-sand-border font-bold';
     }
-    if (role === 'SHOPKEEPER' || role === 'STOCK_COUNTER') {
+    if (['VERIFICATION_OFFICER', 'COLD_CHAIN_OFFICER', 'SHOPKEEPER', 'STOCK_COUNTER'].includes(role)) {
       return 'bg-abyss-elevated text-volt border border-sand-border font-bold';
     }
     return 'bg-sand-base text-sand-text border border-sand-border font-semibold';
@@ -99,7 +103,7 @@ export default function Screen7StaffDirectory() {
                 </span>
               </div>
               <p className="text-xs text-abyss-muted font-mono mt-0.5">
-                Centralized directory of Regional Directors, Facility Managers, Warehouse Shopkeepers, and Qualified Vendors.
+                Centralized directory of Regional Directors, Facility Managers, Cold-Chain & Stock Verification Officers, and Qualified Vendors.
               </p>
             </div>
           </div>
@@ -141,7 +145,8 @@ export default function Screen7StaffDirectory() {
             <option value="ALL">All Roles</option>
             <option value="REGIONAL_HEAD">Regional Head</option>
             <option value="HOSPITAL_MANAGER">Hospital Manager</option>
-            <option value="SHOPKEEPER">Shopkeeper</option>
+            <option value="VERIFICATION_OFFICER">Cold-Chain & Stock Verification Officer</option>
+            <option value="SHOPKEEPER">Shopkeeper (Legacy)</option>
             <option value="SUPPLIER">Supplier</option>
           </select>
 

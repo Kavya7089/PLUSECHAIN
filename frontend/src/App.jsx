@@ -84,7 +84,9 @@ function DashboardShell() {
   // Dynamic Document Title
   const activeScreenTitle = useMemo(() => {
     if (!isAuthenticated) return 'Sign In';
-    if (['STOCK_COUNTER', 'SHOPKEEPER'].includes(user?.role)) return 'Shopkeeper Approvals';
+    if (['VERIFICATION_OFFICER', 'COLD_CHAIN_OFFICER', 'STOCK_COUNTER', 'SHOPKEEPER'].includes(user?.role)) {
+      return 'Verification & Cold-Chain Approvals';
+    }
     if (user?.role === 'SUPPLIER') return 'Supplier Portal';
     switch (activeScreen) {
       case 1:
@@ -196,7 +198,7 @@ function DashboardShell() {
   // If not authenticated, render LoginScreen with 3D Background (All hooks already called)
   if (!isAuthenticated) {
     return (
-      <div className="relative min-h-screen bg-abyss-canvas/80 text-abyss-text flex font-sans selection:bg-volt selection:text-volt-text">
+      <div className="relative min-h-screen bg-abyss-canvas text-abyss-text flex font-sans selection:bg-volt selection:text-volt-text">
         <ThreeBackground />
         <div className="relative z-10 w-full flex flex-col min-h-screen">
           <ScrollProgressBar />
@@ -209,7 +211,7 @@ function DashboardShell() {
   }
 
   return (
-    <div className="relative min-h-screen bg-abyss-canvas/85 text-abyss-text flex font-sans selection:bg-volt selection:text-volt-text">
+    <div className="relative min-h-screen bg-abyss-canvas text-abyss-text flex font-sans selection:bg-volt selection:text-volt-text">
       {/* 3D Interactive Ambient Three.js Background */}
       <ThreeBackground />
 
@@ -297,7 +299,11 @@ function DashboardShell() {
                     ? 'REGIONAL HEAD • ALL MUNICIPALITIES'
                     : user?.role === 'SUPPLIER'
                     ? `${user?.supplierId || 'V1001'} • SUPPLIER`
-                    : `${user?.hospitalId || 'H004'} • ${user?.city || 'BHOPAL'} • ${user?.role === 'STOCK_COUNTER' ? 'SHOPKEEPER' : 'MANAGER'}`}
+                    : `${user?.hospitalId || 'H004'} • ${user?.city || 'BHOPAL'} • ${
+                        ['VERIFICATION_OFFICER', 'COLD_CHAIN_OFFICER', 'STOCK_COUNTER', 'SHOPKEEPER'].includes(user?.role)
+                          ? 'VERIFICATION OFFICER'
+                          : 'MANAGER'
+                      }`}
                 </span>
               </div>
             </div>
@@ -355,11 +361,11 @@ function DashboardShell() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => quickDemoLogin('shopkeeper')}
+                  onClick={() => quickDemoLogin('verification_officer')}
                   className="px-2 py-0.5 rounded hover:bg-abyss-card text-abyss-muted hover:text-abyss-text transition-colors"
-                  title="Switch to H004 Shopkeeper"
+                  title="Switch to Cold-Chain & Stock Verification Officer"
                 >
-                  Shop
+                  Verify
                 </button>
                 <button
                   type="button"
@@ -521,7 +527,7 @@ function DashboardShell() {
 
               {activeScreen === 7 && <Screen7StaffDirectory />}
             </>
-          ) : ['STOCK_COUNTER', 'SHOPKEEPER'].includes(user?.role) ? (
+          ) : ['VERIFICATION_OFFICER', 'COLD_CHAIN_OFFICER', 'STOCK_COUNTER', 'SHOPKEEPER'].includes(user?.role) ? (
             <ShopkeeperPortal />
           ) : user?.role === 'SUPPLIER' ? (
             <SupplierPortal />

@@ -111,7 +111,9 @@ export function PulseChainProvider({ children }) {
     // Map roles for backwards and forwards compatibility
     let normalizedRole = rawRole;
     if (rawRole === 'HOSPITAL_MANAGER') normalizedRole = 'INVENTORY_MANAGER';
-    if (rawRole === 'SHOPKEEPER') normalizedRole = 'STOCK_COUNTER';
+    if (['SHOPKEEPER', 'STOCK_COUNTER', 'VERIFICATION_OFFICER', 'COLD_CHAIN_OFFICER'].includes(rawRole)) {
+      normalizedRole = 'VERIFICATION_OFFICER';
+    }
 
     const normalizedUser = {
       id: authUser.id,
@@ -120,6 +122,9 @@ export function PulseChainProvider({ children }) {
       full_name: profileData?.full_name || meta.full_name || 'User',
       role: normalizedRole,
       canonicalRole: rawRole,
+      designation: ['VERIFICATION_OFFICER', 'COLD_CHAIN_OFFICER', 'STOCK_COUNTER', 'SHOPKEEPER'].includes(normalizedRole)
+        ? 'Cold-Chain & Stock Verification Officer'
+        : null,
       hospitalId: profileData?.hospital_id || meta.hospital_id || (normalizedRole === 'INVENTORY_MANAGER' ? 'H005' : 'H004'),
       hospital_id: profileData?.hospital_id || meta.hospital_id || (normalizedRole === 'INVENTORY_MANAGER' ? 'H005' : 'H004'),
       supplierId: profileData?.supplier_id || meta.supplier_id || (normalizedRole === 'SUPPLIER' ? 'V1001' : null),
@@ -192,7 +197,7 @@ export function PulseChainProvider({ children }) {
         supplier_id: role === 'SUPPLIER' ? (supplier_id || 'V1001') : null,
         city: city || 'BHOPAL',
         region_name: region_name || (role === 'REGIONAL_HEAD' ? 'MP_CENTRAL_WEST' : null),
-        warehouse_bay: warehouse_bay || (role === 'SHOPKEEPER' ? 'COLD_CHAIN_BAY_1' : null),
+        warehouse_bay: warehouse_bay || (['VERIFICATION_OFFICER', 'COLD_CHAIN_OFFICER', 'SHOPKEEPER', 'STOCK_COUNTER'].includes(role) ? 'COLD_CHAIN_BAY_1' : null),
       });
 
       // 2. Sign in via Supabase client to get active session
@@ -281,9 +286,19 @@ export function PulseChainProvider({ children }) {
     let email = 'kavyarajoria9691@gmail.com';
     let defaultPass = 'Pulse@2026';
 
-    if (roleKey === 'shopkeeper' || roleKey === 'STOCK_COUNTER') {
+    if (
+      roleKey === 'verification_officer' ||
+      roleKey === 'cold_chain_officer' ||
+      roleKey === 'officer' ||
+      roleKey === 'shopkeeper' ||
+      roleKey === 'STOCK_COUNTER'
+    ) {
       email = 'tiwarisejal80@gmail.com';
-    } else if (roleKey === 'shopkeeper_h005') {
+    } else if (
+      roleKey === 'verification_officer_h005' ||
+      roleKey === 'officer_h005' ||
+      roleKey === 'shopkeeper_h005'
+    ) {
       email = 'shopkeeper.h005@pulsechain.org';
     } else if (roleKey === 'manager_indore' || roleKey === 'h006') {
       email = 'manager.h006@pulsechain.org';

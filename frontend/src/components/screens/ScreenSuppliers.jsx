@@ -311,7 +311,7 @@ export default function ScreenSuppliers({
             <span>Monitored Vendors</span>
             <Building2 className="w-4 h-4 text-volt" />
           </div>
-          <div className="text-3xl font-black text-abyss-text font-mono">
+          <div className="text-3xl font-black text-abyss-text dark:text-volt font-mono">
             {totalSuppliersCount}
           </div>
           <div className="text-[11px] text-abyss-muted dark:text-volt flex items-center space-x-1 font-mono">
@@ -339,7 +339,7 @@ export default function ScreenSuppliers({
             <span>Cold-Chain Audit</span>
             <ShieldCheck className="w-4 h-4 text-volt" />
           </div>
-          <div className="text-3xl font-black text-abyss-text font-mono flex items-baseline space-x-2">
+          <div className="text-3xl font-black text-abyss-text dark:text-volt font-mono flex items-baseline space-x-2">
             <span>{compliantCount}</span>
             <span className="text-xs text-emerald-700 dark:text-emerald-400 font-sans font-bold">Passed</span>
             <span className="text-sm text-abyss-muted">/</span>
@@ -589,7 +589,7 @@ export default function ScreenSuppliers({
                       <div className="w-44 space-y-1.5 text-[10px] font-mono">
                         <div className="flex items-center justify-between text-abyss-muted">
                           <span>Delivery Speed:</span>
-                          <strong className="text-abyss-text">{supplier.DELIVERY_SPEED || 90}%</strong>
+                          <strong className="text-abyss-text dark:text-volt font-bold">{supplier.DELIVERY_SPEED || 90}%</strong>
                         </div>
                         <div className="w-full h-1 bg-abyss-elevated border border-sand-border/30 rounded-full overflow-hidden">
                           <div className="h-full bg-volt text-volt-text rounded-full" style={{ width: `${supplier.DELIVERY_SPEED || 90}%` }}></div>
