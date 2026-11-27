@@ -60,7 +60,7 @@
       "DAILY_USE": 25,
       "UNIT": "EA",
       "MATERIAL_NAME": "Insulin Glargine",
-      "daysCover": 5
+      "daysCover": 18
     },
     {
       "HOSPITAL_ID": "H004",
@@ -527,14 +527,14 @@
       "SUPPLIER_NAME": "BioPharm Global Logistics",
       "MATERIAL_ID": "AMX250",
       "LEAD_TIME": 2,
-      "CAPACITY": 10000,
-      "UNIT_COST": 80,
+      "CAPACITY": 6650,
+      "UNIT_COST": 85,
       "CURRENCY": "INR",
-      "COMPLIANCE": "Y",
+      "COMPLIANCE": "N",
       "RELIABILITY": "80",
       "TRUST_SCORE": 83.25,
-      "SUPPLIER_TIER": "GOLD",
-      "IS_ELIGIBLE": "Y",
+      "SUPPLIER_TIER": "BLOCKED",
+      "IS_ELIGIBLE": "N",
       "DELAY_REASON": "                                                                                                                                                                                                      0",
       "DELIVERY_SPEED": 82,
       "ON_TIME_RATE": 84,
@@ -542,21 +542,22 @@
       "EMERG_RESPONSE": 80,
       "COLD_CHAIN_SCORE": 88,
       "FULFILMENT_RATE": 85,
-      "DOC_CERT_SCORE": 85
+      "DOC_CERT_SCORE": 85,
+      "isLiveBid": true
     },
     {
       "SUPPLIER_ID": "V1001",
       "SUPPLIER_NAME": "BioPharm Global Logistics",
       "MATERIAL_ID": "PAR050",
       "LEAD_TIME": 2,
-      "CAPACITY": 5800,
+      "CAPACITY": 7500,
       "UNIT_COST": 85,
       "CURRENCY": "INR",
-      "COMPLIANCE": "N",
+      "COMPLIANCE": "Y",
       "RELIABILITY": "94",
       "TRUST_SCORE": 95,
-      "SUPPLIER_TIER": "BLOCKED",
-      "IS_ELIGIBLE": "N",
+      "SUPPLIER_TIER": "PLATINUM",
+      "IS_ELIGIBLE": "Y",
       "DELAY_REASON": "                                                                                                                                                                                                      0",
       "DELIVERY_SPEED": 96,
       "ON_TIME_RATE": 95,
@@ -564,7 +565,8 @@
       "EMERG_RESPONSE": 90,
       "COLD_CHAIN_SCORE": 95,
       "FULFILMENT_RATE": 94,
-      "DOC_CERT_SCORE": 96
+      "DOC_CERT_SCORE": 96,
+      "isLiveBid": true
     },
     {
       "SUPPLIER_ID": "V1003",
@@ -722,6 +724,90 @@
     }
   ],
   "supplierBids": [
+    {
+      "id": "BID-1795806782576",
+      "timestamp": "2026-11-27T19:13:02.576Z",
+      "supplierId": "V1001",
+      "supplier_id": "V1001",
+      "supplierName": "Saumay Dubey (MediSupply)",
+      "materialId": "PAR050",
+      "material_id": "PAR050",
+      "rfq_hospital_id": "H003",
+      "rfqHospitalId": "H003",
+      "hospitalId": "H003",
+      "unitCost": 85,
+      "unit_cost": 85,
+      "currency": "INR",
+      "leadTime": 2,
+      "lead_time_days": 2,
+      "capacity": 7500,
+      "offered_qty": 7500,
+      "compliance": "Y",
+      "delayReason": null,
+      "delay_reason": null,
+      "osrmRoute": {
+        "distanceKm": 315.8,
+        "durationHours": 3.8
+      },
+      "status": "ACTIVE_PROPOSAL",
+      "submittedBy": "soumaydubey073@gmail.com"
+    },
+    {
+      "id": "BID-1795805333865",
+      "timestamp": "2026-11-27T18:48:53.865Z",
+      "supplierId": "V1001",
+      "supplier_id": "V1001",
+      "supplierName": "Saumay Dubey (MediSupply)",
+      "materialId": "AMX250",
+      "material_id": "AMX250",
+      "rfq_hospital_id": "H003",
+      "rfqHospitalId": "H003",
+      "hospitalId": "H003",
+      "unitCost": 85,
+      "unit_cost": 85,
+      "currency": "INR",
+      "leadTime": 2,
+      "lead_time_days": 2,
+      "capacity": 6650,
+      "offered_qty": 6650,
+      "compliance": "N",
+      "delayReason": null,
+      "delay_reason": null,
+      "osrmRoute": {
+        "distanceKm": 315.8,
+        "durationHours": 3.8
+      },
+      "status": "FLAGGED_EXCURSION",
+      "submittedBy": "soumaydubey073@gmail.com"
+    },
+    {
+      "id": "BID-1795805165136",
+      "timestamp": "2026-11-27T18:46:05.136Z",
+      "supplierId": "V1001",
+      "supplier_id": "V1001",
+      "supplierName": "Saumay Dubey (MediSupply)",
+      "materialId": "AMX250",
+      "material_id": "AMX250",
+      "rfq_hospital_id": "H003",
+      "rfqHospitalId": "H003",
+      "hospitalId": "H003",
+      "unitCost": 85,
+      "unit_cost": 85,
+      "currency": "INR",
+      "leadTime": 2,
+      "lead_time_days": 2,
+      "capacity": 5500,
+      "offered_qty": 5500,
+      "compliance": "N",
+      "delayReason": null,
+      "delay_reason": null,
+      "osrmRoute": {
+        "distanceKm": 315.8,
+        "durationHours": 3.8
+      },
+      "status": "FLAGGED_EXCURSION",
+      "submittedBy": "soumaydubey073@gmail.com"
+    },
     {
       "id": "BID-1795793906715",
       "timestamp": "2026-11-27T15:38:26.715Z",
@@ -1058,5 +1144,5 @@
       "status": "COMPLETED_SUCCESS"
     }
   ],
-  "lastUpdated": "2026-11-27T18:33:03.984Z"
+  "lastUpdated": "2026-11-27T19:13:09.884Z"
 }

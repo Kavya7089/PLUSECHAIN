@@ -97,6 +97,42 @@
   ],
   "supplierSla": [
     {
+      "ID": "SLA-MWZCZQ1Q-995",
+      "SUPPLIER_ID": "V1001",
+      "MATERIAL_ID": "PAR050",
+      "TRUST_SCORE": 88,
+      "SUPPLIER_TIER": "GOLD",
+      "OSRM_TRAVEL_DAYS": 1,
+      "PROMISED_LEAD_DAYS": 2,
+      "DELAY_FLAG": "N",
+      "DELAY_REASON": "Proposal registered via Supplier Portal",
+      "RECORDED_AT": "2026-11-27T19:13:03.134Z"
+    },
+    {
+      "ID": "SLA-MWZC4O2K-139",
+      "SUPPLIER_ID": "V1001",
+      "MATERIAL_ID": "AMX250",
+      "TRUST_SCORE": 88,
+      "SUPPLIER_TIER": "BLOCKED",
+      "OSRM_TRAVEL_DAYS": 1,
+      "PROMISED_LEAD_DAYS": 2,
+      "DELAY_FLAG": "N",
+      "DELAY_REASON": "Proposal registered via Supplier Portal",
+      "RECORDED_AT": "2026-11-27T18:48:54.236Z"
+    },
+    {
+      "ID": "SLA-MWZC12VG-284",
+      "SUPPLIER_ID": "V1001",
+      "MATERIAL_ID": "AMX250",
+      "TRUST_SCORE": 88,
+      "SUPPLIER_TIER": "BLOCKED",
+      "OSRM_TRAVEL_DAYS": 1,
+      "PROMISED_LEAD_DAYS": 2,
+      "DELAY_FLAG": "N",
+      "DELAY_REASON": "Proposal registered via Supplier Portal",
+      "RECORDED_AT": "2026-11-27T18:46:06.796Z"
+    },
+    {
       "ID": "SLA-MWZ5BR1T-396",
       "SUPPLIER_ID": "V1001",
       "MATERIAL_ID": "AMX002",
