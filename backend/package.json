@@ -4,7 +4,7 @@
   "description": "PulseChain - Agentic Supply Chain Resilience Backend with SAP S/4HANA OData & HANA Cloud Integration",
   "main": "server.js",
   "scripts": {
-    "build": "node -e \"console.log('PulseChain backend build complete. Zero compilation required for Node.js.')\"",
+    "build": "npm install",
     "start": "node server.js",
     "dev": "node server.js",
     "test": "node -e \"console.log('Testing backend syntax...')\""
