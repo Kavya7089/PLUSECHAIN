@@ -29,15 +29,12 @@ test/
 tests/
 
 # Root files (Active project is contained in backend/ and frontend/)
-/server.js
 /sapAdapter.js
 /authMiddleware.js
 /geoRoutingService.js
 /externalSensingService.js
 /supabaseClient.js
 /data/
-/package.json
-/package-lock.json
 
 # Logs & temp
 *.log

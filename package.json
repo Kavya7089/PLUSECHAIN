@@ -1,0 +1,42 @@
+{
+  "name": "pulsechain",
+  "version": "1.0.0",
+  "description": "PulseChain - Agentic Supply Chain Resilience Dashboard with SAP RFC Integration",
+  "main": "server.js",
+  "scripts": {
+    "build": "npm --prefix backend run build",
+    "build:backend": "npm --prefix backend run build",
+    "build:frontend": "npm --prefix frontend run build",
+    "build:all": "npm --prefix backend run build && npm --prefix frontend run build",
+    "start": "node backend/server.js",
+    "start:backend": "node backend/server.js",
+    "start:frontend": "npm --prefix frontend run preview",
+    "server": "node backend/server.js",
+    "client": "npm --prefix frontend run dev",
+    "build:client": "npm --prefix frontend run build",
+    "test": "node -e \"console.log('Testing server syntax...'); require('./backend/server.js');\""
+  },
+  "keywords": [
+    "pulsechain",
+    "sap",
+    "node-rfc",
+    "supply-chain",
+    "resilience",
+    "agentic-ai",
+    "react",
+    "tailwind"
+  ],
+  "author": "PulseChain Development Team",
+  "license": "MIT",
+  "dependencies": {
+    "@google/genai": "^3.3.0",
+    "@supabase/supabase-js": "^2.119.2",
+    "axios": "^1.21.1",
+    "bcryptjs": "^3.0.3",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "jsonwebtoken": "^9.0.3",
+    "nodemailer": "^10.6.0"
+  }
+}
