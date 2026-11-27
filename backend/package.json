@@ -1,14 +1,24 @@
 {
-  "name": "pulsechain",
+  "name": "pulsechain-backend",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "description": "PulseChain - Agentic Supply Chain Resilience Backend with SAP S/4HANA OData & HANA Cloud Integration",
+  "main": "server.js",
   "scripts": {
+    "build": "node -e \"console.log('PulseChain backend build complete. Zero compilation required for Node.js.')\"",
     "start": "node server.js",
+    "dev": "node server.js",
     "test": "node -e \"console.log('Testing backend syntax...')\""
   },
-  "keywords": [],
-  "author": "",
+  "keywords": [
+    "pulsechain",
+    "sap",
+    "s4hana",
+    "hana-cloud",
+    "supply-chain",
+    "resilience",
+    "node"
+  ],
+  "author": "PulseChain Development Team",
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {

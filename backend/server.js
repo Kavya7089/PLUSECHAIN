@@ -2711,7 +2711,7 @@ Instructions:
 const frontendDistPath = path.join(__dirname, '../frontend/dist');
 app.use(express.static(frontendDistPath));
 
-// Catch-all handler to serve index.html for client-side routing (compatible with Express 5 & 4)
+// Catch-all handler to serve index.html for client-side routing or API status when deployed separately
 app.use((req, res) => {
   if (req.path.startsWith('/api')) {
     return res.status(404).json({ error: 'Endpoint not found' });
@@ -2720,7 +2720,24 @@ app.use((req, res) => {
   if (fs.existsSync(indexPath)) {
     return res.sendFile(indexPath);
   }
-  return res.status(200).send('PulseChain API Server is active. Frontend build in progress.');
+  // Standalone backend fallback when frontend is deployed separately
+  if (req.path === '/' || req.path === '') {
+    return res.status(200).json({
+      service: 'PulseChain Enterprise Supply Chain API',
+      status: 'ONLINE',
+      mode: 'STANDALONE_BACKEND',
+      version: '3.1.0',
+      endpoints: {
+        status: '/api/status',
+        inventory: '/api/inventory',
+        auth: '/api/auth/login',
+        sapStatus: '/api/sap/status',
+        hanaCloud: '/api/analytics/hana-cloud',
+      },
+      message: 'PulseChain Backend is active and running independently.',
+    });
+  }
+  return res.status(200).send('PulseChain API Server is active.');
 });
 
 // Start Server with clean console output and robust port error handling
