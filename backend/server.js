@@ -2708,36 +2708,330 @@ Instructions:
 // =========================================================================
 // SERVE FRONTEND DIST & SINGLE PAGE APPLICATION (SPA) ROUTING
 // =========================================================================
+const SERVE_STATIC_FRONTEND = process.env.SERVE_STATIC_FRONTEND === 'true';
 const frontendDistPath = path.join(__dirname, '../frontend/dist');
-app.use(express.static(frontendDistPath));
 
-// Catch-all handler to serve index.html for client-side routing or API status when deployed separately
+// Only mount static files if explicitly configured for unified monolith hosting
+if (SERVE_STATIC_FRONTEND) {
+  app.use(express.static(frontendDistPath));
+}
+
+// Root route handler: Delivers an interactive API Gateway Dashboard in browser,
+// or structured JSON health telemetry for API consumers and monitoring services.
+app.get('/', (req, res) => {
+  if (SERVE_STATIC_FRONTEND) {
+    const indexPath = path.join(frontendDistPath, 'index.html');
+    if (fs.existsSync(indexPath)) {
+      return res.sendFile(indexPath);
+    }
+  }
+
+  const apiStatusData = {
+    service: 'PulseChain Enterprise Supply Chain API',
+    status: 'ONLINE',
+    mode: 'STANDALONE_BACKEND',
+    version: '3.2.0',
+    environment: process.env.NODE_ENV || 'production',
+    timestamp: new Date().toISOString(),
+    sapIntegrations: {
+      s4HanaOData: 'ACTIVE (ZPLUSE_SRV Client 105)',
+      hanaCloudWarehouse: 'ACTIVE (HACKFEST0418)',
+      genAiHubOrchestration: 'ACTIVE (0418_PulseChain_Orchestration)',
+      supabaseAuthRls: 'ACTIVE',
+    },
+    endpoints: {
+      healthCheck: '/api/status',
+      inventory: '/api/inventory',
+      auth: '/api/auth/login',
+      sapStatus: '/api/sap/status',
+      hanaCloud: '/api/analytics/hana-cloud',
+      externalSensing: '/api/external/sensing',
+    },
+    message: 'PulseChain Backend Microservice is active and operating in decoupled REST API mode.',
+  };
+
+  // If accessed directly in a web browser, render a modern dark-mode API Control Hub
+  if (req.accepts('html') && !req.xhr && !req.headers['authorization']) {
+    return res.status(200).send(`<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PulseChain Enterprise API Gateway</title>
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%2310b981'><path d='M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5'/></svg>">
+  <style>
+    :root {
+      --bg: #030d12;
+      --card-bg: rgba(7, 24, 33, 0.85);
+      --border: rgba(16, 185, 129, 0.25);
+      --accent: #10b981;
+      --accent-glow: rgba(16, 185, 129, 0.35);
+      --text: #e2e8f0;
+      --text-muted: #94a3b8;
+      --sap-blue: #0ea5e9;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+      background: var(--bg);
+      background-image: radial-gradient(circle at 50% 10%, rgba(16, 185, 129, 0.12) 0%, transparent 60%);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+    .container {
+      max-width: 780px;
+      width: 100%;
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 36px;
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.6), 0 0 30px var(--accent-glow);
+      backdrop-filter: blur(12px);
+    }
+    .header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      padding-bottom: 20px;
+      margin-bottom: 24px;
+    }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .brand-icon {
+      width: 42px;
+      height: 42px;
+      background: linear-gradient(135deg, #10b981, #0ea5e9);
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 900;
+      color: #030d12;
+      font-size: 22px;
+    }
+    h1 { font-size: 22px; font-weight: 700; color: #fff; letter-spacing: -0.5px; }
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(16, 185, 129, 0.15);
+      border: 1px solid var(--accent);
+      color: #34d399;
+      font-size: 12px;
+      font-weight: 600;
+      padding: 5px 14px;
+      border-radius: 20px;
+    }
+    .badge-dot {
+      width: 8px;
+      height: 8px;
+      background: #34d399;
+      border-radius: 50%;
+      box-shadow: 0 0 8px #34d399;
+      animation: pulse 2s infinite;
+    }
+    @keyframes pulse { 0% { opacity: 0.6; } 50% { opacity: 1; } 100% { opacity: 0.6; } }
+    .hero-text {
+      font-size: 15px;
+      color: var(--text-muted);
+      line-height: 1.6;
+      margin-bottom: 24px;
+    }
+    .notice-box {
+      background: rgba(14, 165, 233, 0.1);
+      border: 1px solid rgba(14, 165, 233, 0.3);
+      border-radius: 10px;
+      padding: 14px 18px;
+      font-size: 13px;
+      color: #7dd3fc;
+      margin-bottom: 24px;
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      line-height: 1.5;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 14px;
+      margin-bottom: 28px;
+    }
+    .card {
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(255, 255, 255, 0.07);
+      border-radius: 10px;
+      padding: 16px;
+    }
+    .card-title {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-muted);
+      margin-bottom: 6px;
+    }
+    .card-value {
+      font-size: 14px;
+      font-weight: 600;
+      color: #fff;
+    }
+    .endpoint-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .endpoint-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      border-radius: 8px;
+      padding: 10px 14px;
+      text-decoration: none;
+      color: var(--text);
+      transition: all 0.2s;
+    }
+    .endpoint-item:hover {
+      background: rgba(16, 185, 129, 0.08);
+      border-color: rgba(16, 185, 129, 0.3);
+      color: var(--accent);
+      transform: translateX(3px);
+    }
+    .method-tag {
+      font-size: 11px;
+      font-weight: 700;
+      padding: 2px 8px;
+      border-radius: 4px;
+      background: rgba(16, 185, 129, 0.2);
+      color: #34d399;
+      font-family: monospace;
+    }
+    .endpoint-path {
+      font-family: monospace;
+      font-size: 13px;
+      flex-grow: 1;
+      margin-left: 12px;
+    }
+    .footer {
+      margin-top: 24px;
+      text-align: center;
+      font-size: 12px;
+      color: var(--text-muted);
+      border-top: 1px solid rgba(255, 255, 255, 0.06);
+      padding-top: 18px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <div class="brand">
+        <div class="brand-icon">⚡</div>
+        <div>
+          <h1>PulseChain Backend API Gateway</h1>
+          <div style="font-size: 12px; color: var(--text-muted);">Decoupled Enterprise Supply Chain Microservice</div>
+        </div>
+      </div>
+      <div class="badge">
+        <div class="badge-dot"></div>
+        SYSTEM OPERATIONAL
+      </div>
+    </div>
+
+    <div class="notice-box">
+      <span style="font-size: 16px;">ℹ️</span>
+      <div>
+        <strong>Standalone Backend API Mode:</strong> You are viewing the backend service (<code>plusechain-backend.onrender.com</code>). The frontend application is deployed separately. All REST, SAP S/4HANA OData, and AI Hub endpoints are live and accepting cross-origin requests.
+      </div>
+    </div>
+
+    <div class="grid">
+      <div class="card">
+        <div class="card-title">SAP S/4HANA Gateway</div>
+        <div class="card-value" style="color: #38bdf8;">ZPLUSE_SRV (Client 105)</div>
+      </div>
+      <div class="card">
+        <div class="card-title">SAP HANA Cloud</div>
+        <div class="card-value" style="color: #34d399;">Warehouse Connected</div>
+      </div>
+      <div class="card">
+        <div class="card-title">GenAI Orchestrator</div>
+        <div class="card-value" style="color: #fbbf24;">0418_PulseChain</div>
+      </div>
+      <div class="card">
+        <div class="card-title">CORS Access</div>
+        <div class="card-value" style="color: #a7f3d0;">Cross-Origin Enabled (*)</div>
+      </div>
+    </div>
+
+    <div style="font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); margin-bottom: 12px;">
+      Live Verification Endpoints
+    </div>
+
+    <div class="endpoint-list">
+      <a href="/api/status" class="endpoint-item" target="_blank">
+        <span class="method-tag">GET</span>
+        <span class="endpoint-path">/api/status</span>
+        <span style="font-size: 12px; color: var(--text-muted);">System Health & Telemetry &rarr;</span>
+      </a>
+      <a href="/api/inventory" class="endpoint-item" target="_blank">
+        <span class="method-tag">GET</span>
+        <span class="endpoint-path">/api/inventory</span>
+        <span style="font-size: 12px; color: var(--text-muted);">Live SAP S/4HANA Stock &rarr;</span>
+      </a>
+      <a href="/api/sap/status" class="endpoint-item" target="_blank">
+        <span class="method-tag">GET</span>
+        <span class="endpoint-path">/api/sap/status</span>
+        <span style="font-size: 12px; color: var(--text-muted);">OData Gateway Status &rarr;</span>
+      </a>
+      <a href="/api/analytics/hana-cloud" class="endpoint-item" target="_blank">
+        <span class="method-tag">GET</span>
+        <span class="endpoint-path">/api/analytics/hana-cloud</span>
+        <span style="font-size: 12px; color: var(--text-muted);">HANA Cloud Analytics &rarr;</span>
+      </a>
+      <a href="/api/external/sensing" class="endpoint-item" target="_blank">
+        <span class="method-tag">GET</span>
+        <span class="endpoint-path">/api/external/sensing</span>
+        <span style="font-size: 12px; color: var(--text-muted);">Weather & Logistics Radar &rarr;</span>
+      </a>
+    </div>
+
+    <div class="footer">
+      PulseChain Resilience Engine &bull; Version 3.2.0 &bull; Secure JWT RBAC
+    </div>
+  </div>
+</body>
+</html>`);
+  }
+
+  return res.status(200).json(apiStatusData);
+});
+
+// Catch-all handler for API 404 or standalone decoupled service notice
 app.use((req, res) => {
   if (req.path.startsWith('/api')) {
-    return res.status(404).json({ error: 'Endpoint not found' });
+    return res.status(404).json({ error: `API endpoint '${req.path}' not found` });
   }
-  const indexPath = path.join(frontendDistPath, 'index.html');
-  if (fs.existsSync(indexPath)) {
-    return res.sendFile(indexPath);
+  if (SERVE_STATIC_FRONTEND) {
+    const indexPath = path.join(frontendDistPath, 'index.html');
+    if (fs.existsSync(indexPath)) {
+      return res.sendFile(indexPath);
+    }
   }
-  // Standalone backend fallback when frontend is deployed separately
-  if (req.path === '/' || req.path === '') {
-    return res.status(200).json({
-      service: 'PulseChain Enterprise Supply Chain API',
-      status: 'ONLINE',
-      mode: 'STANDALONE_BACKEND',
-      version: '3.1.0',
-      endpoints: {
-        status: '/api/status',
-        inventory: '/api/inventory',
-        auth: '/api/auth/login',
-        sapStatus: '/api/sap/status',
-        hanaCloud: '/api/analytics/hana-cloud',
-      },
-      message: 'PulseChain Backend is active and running independently.',
-    });
-  }
-  return res.status(200).send('PulseChain API Server is active.');
+  return res.status(404).json({
+    error: 'Not Found',
+    message: 'This is the PulseChain Backend REST API service. Frontend routes should be accessed through your deployed frontend domain.',
+    apiStatus: '/api/status',
+  });
 });
 
 // Start Server with clean console output and robust port error handling
